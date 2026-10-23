@@ -1,4 +1,5 @@
 import type { ComponentChildren } from 'preact';
+import { createPortal } from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
 import { getMeta } from '../logic/state';
 import { getState, tick } from '../store';
@@ -96,6 +97,11 @@ export function UiHost() {
 
 // ---------------------------------------------------------------- sheets
 
+/** Renders full-screen layers at the top of the page, outside the scrolling content. */
+export function Portal({ children }: { children: ComponentChildren }) {
+  return createPortal(children, document.body);
+}
+
 export function Sheet(props: { title: string; onClose: () => void; children: ComponentChildren }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && props.onClose();
@@ -103,17 +109,19 @@ export function Sheet(props: { title: string; onClose: () => void; children: Com
     return () => window.removeEventListener('keydown', onKey);
   }, [props.onClose]);
   return (
-    <div class="overlay sheet-overlay" onClick={props.onClose}>
-      <div class="sheet" role="dialog" aria-modal="true" aria-label={props.title} onClick={(e) => e.stopPropagation()}>
-        <div class="sheet-head">
-          <h2>{props.title}</h2>
-          <button class="icon-btn" aria-label="Close" onClick={props.onClose}>
-            ✕
-          </button>
+    <Portal>
+      <div class="overlay sheet-overlay" onClick={props.onClose}>
+        <div class="sheet" role="dialog" aria-modal="true" aria-label={props.title} onClick={(e) => e.stopPropagation()}>
+          <div class="sheet-head">
+            <h2>{props.title}</h2>
+            <button class="icon-btn" aria-label="Close" onClick={props.onClose}>
+              ✕
+            </button>
+          </div>
+          <div class="sheet-body">{props.children}</div>
         </div>
-        <div class="sheet-body">{props.children}</div>
       </div>
-    </div>
+    </Portal>
   );
 }
 

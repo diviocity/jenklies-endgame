@@ -6,7 +6,7 @@ import { getMeta } from '../logic/state';
 import { play } from '../sound';
 import { run, useStore } from '../store';
 import type { PullRecord } from '../types';
-import { Amount, fmt, names, PageTitle, report } from './common';
+import { Amount, fmt, names, PageTitle, Portal, report } from './common';
 import { PullSequence } from './PullSequence';
 
 export function Pull() {
@@ -108,7 +108,11 @@ export function Pull() {
         </ul>
       </details>
 
-      {results && <PullSequence results={results} onClose={() => setResults(null)} />}
+      {results && (
+        <Portal>
+          <PullSequence results={results} onClose={() => setResults(null)} />
+        </Portal>
+      )}
     </div>
   );
 }

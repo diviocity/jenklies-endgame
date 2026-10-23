@@ -546,7 +546,7 @@
   flex: 1;
   display: flex;
   align-items: center;
-  min-height: 340px;
+  min-height: min(340px, 50vh);
 }
 
 .single-slot .rcard {
@@ -720,7 +720,7 @@
 }
 
 .rcard.large {
-  min-height: 340px;
+  min-height: min(340px, 50vh);
   padding: 32px 22px 26px;
   gap: 14px;
 }
@@ -750,6 +750,7 @@
 
 .results-foot {
   position: sticky;
+  z-index: 2;
   bottom: 0;
   display: flex;
   align-items: center;
