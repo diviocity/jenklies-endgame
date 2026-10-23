@@ -2,6 +2,47 @@
 
 A personal iPhone web app that turns my daily schedule into a gacha game. I complete my tasks, earn currency (with a bonus for doing them on time), and spend it on pulls. Rare pulls give **indulgences**: treats I've defined for myself and redeem in my free time. Common pulls give collectible **positive affirmations**. It's for me only: no accounts, no server, no monetization.
 
+**Status:** Phase 1 (the core loop) is built. Phase 2 (the pull animation) is next.
+
+- [Using it](#using-it) · [Development](#development) · [Design decisions](#design-decisions) · [Project brief](#project-brief)
+
+## Using it
+
+1. Open the GitHub Pages URL in Safari on the iPhone.
+2. Share → **Add to Home Screen**. Launch it from the icon; it runs full screen and works offline.
+3. Your data lives only on that device. Export a backup from **More → Backup** regularly (the app nags after 7 days). Keep the file in Files or iCloud Drive.
+
+## Development
+
+```sh
+npm install
+npm run dev        # local dev server
+npm test           # unit tests (gacha odds, pity, reward math, actions, backup)
+npm run build      # typecheck + production build into dist/
+```
+
+Stack: Vite, TypeScript and Preact, with IndexedDB through `idb`, and `vite-plugin-pwa` for the manifest and service worker.
+
+- `src/config.ts`: every economy number in one place.
+- `src/logic/`: the game rules as plain functions with no UI or browser dependencies (time, rewards, gacha, actions, backup). Each action returns a list of changes that is saved in a single IndexedDB transaction.
+- `src/store.ts` and `src/db.ts`: in-memory state, saving and loading.
+- `src/ui/`: the screens.
+
+**Deploying:** `.github/workflows/deploy.yml` tests, builds and publishes `dist/` to GitHub Pages on every push to `main`. One-time setup: repo **Settings → Pages → Source: GitHub Actions**. The site is served from `/jenklies-endgame/`; set `BASE_PATH` when building for a different path.
+
+## Design decisions
+
+These fill gaps in the brief:
+
+1. **A 5★ does not reset the 4★ counter.** That matches the brief's "a 4★ about every 8" (resetting would give about 8.5). A 5★ still counts as the "4★ or higher" for the 10-pull guarantee.
+2. **Undo is blocked if those Sparks are already spent** (the balance never goes negative).
+3. **Each template task is either a weekday task or a weekend task**, because the bucket names differ. Tasks like "Up at 5:30" have one entry for each.
+4. **One-off tasks** have weight 1, are valued at that day's rate, and don't count toward the weekly total.
+5. **Six example indulgences** are seeded so pulling works from day one. Edit or retire them.
+6. **Smallest task value:** base is never below 10, and the bonus is half the rounded base.
+7. **Days are locked in on first open:** the first time the app sees a day, it takes a snapshot of that day's tasks, values and deadlines. Template and deadline edits apply from the next day.
+8. **Deadlines before 4:00 AM** are treated as after midnight, the end of the same game day.
+
 ---
 
 ## Project brief

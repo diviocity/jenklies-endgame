@@ -1,0 +1,100 @@
+import { useEffect, useReducer } from 'preact/hooks';
+import { commit, loadAll, replaceAll } from './db';
+import { ActionError, ensureDay, type ActionResult } from './logic/actions';
+import type { BackupFile } from './logic/backup';
+import { applyChanges, emptyState, seedChanges } from './logic/state';
+import type { AppState } from './types';
+
+let state: AppState = emptyState();
+let ready = false;
+let version = 0;
+const listeners = new Set<() => void>();
+
+function notify() {
+  version++;
+  for (const l of listeners) l();
+}
+
+export function getState(): AppState {
+  return state;
+}
+
+export function isReady(): boolean {
+  return ready;
+}
+
+/** Re-renders the calling component whenever app data changes. */
+export function useStore(): AppState {
+  const [, bump] = useReducer((n: number) => n + 1, 0);
+  const renderedVersion = version;
+  useEffect(() => {
+    const rerender = () => bump(undefined);
+    listeners.add(rerender);
+    // Catch up on anything that changed between render and subscribing.
+    if (version !== renderedVersion) rerender();
+    return () => void listeners.delete(rerender);
+  }, []);
+  return state;
+}
+
+async function save(changes: ActionResult<unknown>['changes']) {
+  await commit(changes);
+  applyChanges(state, changes);
+}
+
+/** Starts a new day's snapshot if the clock has rolled past 4 AM. */
+export async function tick(now = new Date()): Promise<void> {
+  const changes = ensureDay(state, now);
+  if (changes.length) {
+    await save(changes);
+    notify();
+  }
+}
+
+export async function init(): Promise<void> {
+  state = await loadAll();
+  if (!state.meta.has('meta')) {
+    const changes = seedChanges(new Date().toISOString());
+    await save(changes);
+  }
+  ready = true;
+  await tick();
+  notify();
+}
+
+export type RunOutcome<T> = { ok: true; result: T } | { ok: false; error: string };
+
+/**
+ * Runs a game action against current data and saves what it changed.
+ * Today's snapshot is always taken first, so template edits never touch today.
+ */
+export function run<T>(action: (s: AppState, now: Date) => ActionResult<T>): Promise<RunOutcome<T>> {
+  // Actions run one at a time so a quick double tap can't act on stale data.
+  const next = queue.then(() => runNow(action));
+  queue = next.then(() => undefined);
+  return next;
+}
+
+let queue: Promise<void> = Promise.resolve();
+
+async function runNow<T>(action: (s: AppState, now: Date) => ActionResult<T>): Promise<RunOutcome<T>> {
+  const now = new Date();
+  try {
+    await tick(now);
+    const { changes, result } = action(state, now);
+    await save(changes);
+    notify();
+    return { ok: true, result };
+  } catch (e) {
+    if (e instanceof ActionError) return { ok: false, error: e.message };
+    console.error(e);
+    return { ok: false, error: `Something went wrong: ${(e as Error).message}` };
+  }
+}
+
+export async function importBackup(file: BackupFile): Promise<void> {
+  await replaceAll(file.data);
+  state = await loadAll();
+  await tick();
+  notify();
+}
