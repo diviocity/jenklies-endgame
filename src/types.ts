@@ -9,6 +9,8 @@ export type Minutes = number;
 export interface Settings {
   deadlines: Record<BucketId, Minutes>;
   soundOn: boolean;
+  /** Play sounds even when the iPhone is on silent (missing in data from before this setting existed). */
+  soundIgnoresSilent?: boolean;
   sparksName: string;
   shardsName: string;
 }
