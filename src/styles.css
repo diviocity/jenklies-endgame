@@ -960,7 +960,7 @@ span.r5 {
   color: var(--muted);
 }
 
-/* ---------------------------------------------------------------- reveal (phase 1 placeholder) */
+/* ---------------------------------------------------------------- overlays */
 
 .overlay {
   position: fixed;
@@ -983,108 +983,6 @@ span.r5 {
   }
 }
 
-.reveal {
-  background:
-    radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--best) 22%, transparent), transparent 65%),
-    #07080a;
-}
-
-.reveal.best-3 {
-  --best: var(--r3);
-}
-.reveal.best-4 {
-  --best: var(--r4);
-}
-.reveal.best-5 {
-  --best: var(--r5);
-}
-
-.reveal-inner {
-  width: 100%;
-  max-width: 560px;
-  max-height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.reveal-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-}
-
-.reveal-single .card {
-  min-height: 300px;
-  padding: 28px 22px;
-}
-
-.reveal-single .card-name {
-  font-size: 26px;
-}
-
-.reveal-single .card-quote {
-  font-size: 22px;
-}
-
-.reveal-single .card-emoji {
-  font-size: 64px;
-}
-
-.card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 132px;
-  padding: 14px 10px;
-  text-align: center;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--rc) 18%, var(--panel-2)), var(--panel));
-  border: 1px solid color-mix(in srgb, var(--rc) 55%, transparent);
-  box-shadow: inset 0 -3px 0 var(--rc);
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
-  animation: card-in 0.35s ease-out both;
-}
-
-@keyframes card-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.96);
-  }
-}
-
-.card-emoji {
-  font-size: 34px;
-  line-height: 1;
-}
-
-.card-name {
-  font-weight: 700;
-  font-size: 15px;
-  line-height: 1.2;
-}
-
-.card-quote {
-  font-size: 13.5px;
-  line-height: 1.35;
-}
-
-.card-quote.repeat {
-  color: var(--muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.card-foot {
-  font-size: 11px;
-  color: var(--muted);
-}
-
 .new,
 .new-tag {
   font-style: normal;
@@ -1102,24 +1000,6 @@ span.r5 {
   top: 6px;
   left: 6px;
   padding: 2px 6px;
-}
-
-.reveal-foot {
-  position: sticky;
-  bottom: 0;
-  padding: 10px 0 2px;
-  background: linear-gradient(transparent, #07080a 30%);
-}
-
-.reveal-grid .card {
-  min-height: 112px;
-}
-
-.reveal-grid .card-quote {
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 /* ---------------------------------------------------------------- bag & lists */
@@ -1614,8 +1494,5 @@ textarea {
 @media (min-width: 700px) {
   .collection {
     grid-template-columns: repeat(3, 1fr);
-  }
-  .reveal-grid {
-    grid-template-columns: repeat(5, 1fr);
   }
 }

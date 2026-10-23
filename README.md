@@ -2,7 +2,7 @@
 
 A personal iPhone web app that turns my daily schedule into a gacha game. I complete my tasks, earn currency (with a bonus for doing them on time), and spend it on pulls. Rare pulls give **indulgences**: treats I've defined for myself and redeem in my free time. Common pulls give collectible **positive affirmations**. It's for me only: no accounts, no server, no monetization.
 
-**Status:** Phase 1 (the core loop) is built. Phase 2 (the pull animation) is next.
+**Status:** Phases 1 (the core loop) and 2 (the pull animation) are built. Streaks, stats and the calendar come later.
 
 - [Using it](#using-it) · [Development](#development) · [Design decisions](#design-decisions) · [Project brief](#project-brief)
 
@@ -42,6 +42,7 @@ These fill gaps in the brief:
 6. **Smallest task value:** base is never below 10, and the bonus is half the rounded base.
 7. **Days are locked in on first open:** the first time the app sees a day, it takes a snapshot of that day's tasks, values and deadlines. Template and deadline edits apply from the next day.
 8. **Deadlines before 4:00 AM** are treated as after midnight, the end of the same game day.
+9. **The pull animation** runs uplink → pod drop → rarity flash → reveal, about 2.7 s (3.5 s when a 5★ drops). The flash takes the color of the best result in the batch (3★ blue, 4★ purple, 5★ gold), and nothing before it hints at the rarity. Pulls are saved before the animation starts, so closing the app mid-animation loses nothing. With reduced motion turned on in iOS, the animation and flash are skipped and the results appear straight away.
 
 ---
 

@@ -6,7 +6,8 @@ import { getMeta } from '../logic/state';
 import { play } from '../sound';
 import { run, useStore } from '../store';
 import type { PullRecord } from '../types';
-import { Amount, fmt, names, PageTitle, report, Stars } from './common';
+import { Amount, fmt, names, PageTitle, report } from './common';
+import { PullSequence } from './PullSequence';
 
 export function Pull() {
   const state = useStore();
@@ -22,11 +23,7 @@ export function Pull() {
     setBusy(true);
     const result = report(await run((s, now) => pull(s, count, now, cryptoRng)));
     setBusy(false);
-    if (result) {
-      const best = Math.max(...result.map((r) => r.rarity)) as 3 | 4 | 5;
-      play(`reveal${best}`);
-      setResults(result);
-    }
+    if (result) setResults(result);
   };
 
   const soft = GACHA.softPityStart;
@@ -111,52 +108,7 @@ export function Pull() {
         </ul>
       </details>
 
-      {results && <Reveal results={results} onClose={() => setResults(null)} />}
-    </div>
-  );
-}
-
-/** Phase 1 placeholder reveal: a quick fade-in of the result cards. */
-function Reveal({ results, onClose }: { results: PullRecord[]; onClose: () => void }) {
-  const state = useStore();
-  const single = results.length === 1;
-  const shards = results.reduce((s, r) => s + r.shards, 0);
-  const best = Math.max(...results.map((r) => r.rarity));
-  return (
-    <div class={`overlay reveal best-${best}`} onClick={onClose}>
-      <div class="reveal-inner" onClick={(e) => e.stopPropagation()}>
-        <div class="eyebrow center">// drop received</div>
-        <div class={single ? 'reveal-single' : 'reveal-grid'}>
-          {results.map((r, i) => {
-            const item = r.kind === 'indulgence' ? state.indulgences.get(r.itemId) : undefined;
-            return (
-              <div key={r.id} class={`card r${r.rarity} ${r.kind}`} style={{ animationDelay: `${i * 60}ms` }}>
-                {r.isNew && <em class="new">NEW</em>}
-                <Stars rarity={r.rarity} />
-                {r.kind === 'indulgence' ? (
-                  <>
-                    <div class="card-emoji">{item?.emoji || '◆'}</div>
-                    <div class="card-name">{r.itemName}</div>
-                  </>
-                ) : (
-                  <div class={`card-quote ${!r.isNew && !single ? 'repeat' : ''}`}>“{r.itemName}”</div>
-                )}
-                <div class="card-foot">
-                  <Amount value={r.shards} currency="shards" signed />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div class="row between reveal-foot">
-          <span class="muted">
-            Total <Amount value={shards} currency="shards" signed />
-          </span>
-          <button class="btn primary" onClick={onClose}>
-            Continue
-          </button>
-        </div>
-      </div>
+      {results && <PullSequence results={results} onClose={() => setResults(null)} />}
     </div>
   );
 }

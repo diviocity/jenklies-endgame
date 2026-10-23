@@ -3,7 +3,7 @@ import { getState } from './store';
 // Tiny synthesized cues. The audio context is only created inside a tap,
 // which is what iOS requires before any sound can play.
 
-type Cue = 'tap' | 'complete' | 'undo' | 'reveal3' | 'reveal4' | 'reveal5' | 'buy';
+type Cue = 'tap' | 'complete' | 'undo' | 'drop' | 'reveal3' | 'reveal4' | 'reveal5' | 'buy';
 
 let ctx: AudioContext | null = null;
 
@@ -37,6 +37,10 @@ const CUES: Record<Cue, [freq: number, start: number, length: number, type: Osci
     [990, 0.07, 0.14, 'triangle'],
   ],
   undo: [[330, 0, 0.12, 'triangle']],
+  drop: [
+    [140, 0, 0.25, 'sine'],
+    [70, 0.02, 0.35, 'triangle'],
+  ],
   buy: [
     [520, 0, 0.08, 'triangle'],
     [780, 0.08, 0.12, 'triangle'],
