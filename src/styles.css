@@ -104,10 +104,10 @@ h3 {
   justify-content: space-between;
   gap: 8px;
   padding: calc(var(--safe-top) + 10px) calc(var(--safe-right) + 16px) 10px calc(var(--safe-left) + 16px);
-  background: rgba(11, 12, 14, 0.92);
+  background: var(--bg);
   border-bottom: 1px solid var(--line);
   position: relative;
-  z-index: 5;
+  z-index: 10;
 }
 
 .topbar::after {
@@ -152,16 +152,24 @@ h3 {
 
 main {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   padding: 0 calc(var(--safe-right) + 16px) 24px calc(var(--safe-left) + 16px);
+  /* Keep animated and clipped panels in their own stacking context, so iOS Safari
+     can't paint them over the header or tab bar while scrolling. */
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  contain: paint;
 }
 
 .tabbar {
+  position: relative;
+  z-index: 10;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   border-top: 1px solid var(--line);
-  background: rgba(11, 12, 14, 0.96);
+  background: var(--bg);
   padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
 }
 
@@ -807,8 +815,12 @@ span.r5 {
     linear-gradient(180deg, var(--panel-2), var(--panel));
 }
 
+.banner-copy {
+  min-width: 0;
+}
+
 .banner-copy h2 {
-  font-size: 22px;
+  font-size: clamp(17px, 5.6vw, 22px);
   text-transform: uppercase;
   margin: 4px 0;
 }
@@ -1488,6 +1500,19 @@ textarea {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+@media (max-width: 380px) {
+  /* Narrow phones: keep just the brand mark so both balances fit. */
+  .brand > span:last-child {
+    display: none;
+  }
+  .banner-art {
+    width: 84px;
+    height: 84px;
+    transform: scale(0.76);
+    transform-origin: left center;
   }
 }
 
