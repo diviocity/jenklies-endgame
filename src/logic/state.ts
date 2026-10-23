@@ -41,6 +41,7 @@ export function defaultMeta(now: string): Meta {
     settings: {
       deadlines: { ...DEFAULT_DEADLINES },
       soundOn: true,
+      soundIgnoresSilent: false,
       sparksName: 'Sparks',
       shardsName: 'Shards',
     },

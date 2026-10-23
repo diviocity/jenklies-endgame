@@ -7,7 +7,23 @@ type Cue = 'tap' | 'complete' | 'undo' | 'drop' | 'reveal3' | 'reveal4' | 'revea
 
 let ctx: AudioContext | null = null;
 
-function audio(): AudioContext | null {
+type AudioSessionType = 'auto' | 'ambient' | 'playback' | 'transient' | 'transient-solo' | 'play-and-record';
+
+/** Safari's Audio Session API (iOS 17+). Elsewhere it doesn't exist and sounds follow the platform default. */
+function audioSession(): { type: AudioSessionType } | undefined {
+  return (navigator as Navigator & { audioSession?: { type: AudioSessionType } }).audioSession;
+}
+
+export function canIgnoreSilentMode(): boolean {
+  return audioSession() !== undefined;
+}
+
+function audio(ignoreSilent: boolean): AudioContext | null {
+  // 'playback' sounds like a media app: it plays on silent, but iOS may pause other apps' audio.
+  const session = audioSession();
+  const type: AudioSessionType = ignoreSilent ? 'playback' : 'auto';
+  if (session && session.type !== type) session.type = type;
+
   if (!ctx) {
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
@@ -65,8 +81,9 @@ const CUES: Record<Cue, [freq: number, start: number, length: number, type: Osci
 
 /** Call only from a tap handler (or code a tap just started). */
 export function play(cue: Cue): void {
-  if (!getState().meta.get('meta')?.settings.soundOn) return;
-  const ac = audio();
+  const settings = getState().meta.get('meta')?.settings;
+  if (!settings?.soundOn) return;
+  const ac = audio(settings.soundIgnoresSilent ?? false);
   if (!ac) return;
   for (const [freq, start, length, type] of CUES[cue]) tone(ac, freq, start, length, type);
 }

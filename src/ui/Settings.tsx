@@ -6,6 +6,7 @@ import { getMeta } from '../logic/state';
 import { BUCKET_LABELS, formatDateTime, inputToMinutes, minutesToInput, WEEKDAY_BUCKETS, WEEKEND_BUCKETS } from '../logic/time';
 import { getState, importBackup, run, useStore } from '../store';
 import type { BucketId, Settings } from '../types';
+import { canIgnoreSilentMode } from '../sound';
 import { BackLink, confirmDialog, PageTitle, report, toast } from './common';
 
 export function SettingsPage() {
@@ -70,6 +71,20 @@ export function SettingsPage() {
             <input type="checkbox" checked={s.soundOn} onChange={(e) => setS({ ...s, soundOn: e.currentTarget.checked })} />
             <span>Sound effects</span>
           </label>
+          {canIgnoreSilentMode() && (
+            <>
+              <label class="switch">
+                <input
+                  type="checkbox"
+                  checked={s.soundIgnoresSilent ?? false}
+                  disabled={!s.soundOn}
+                  onChange={(e) => setS({ ...s, soundIgnoresSilent: e.currentTarget.checked })}
+                />
+                <span>Play even when the iPhone is on silent</span>
+              </label>
+              <p class="hint">This can pause music or podcasts playing in other apps when a sound plays.</p>
+            </>
+          )}
         </section>
         <button class="btn primary wide" type="submit" disabled={!dirty}>
           Save settings
