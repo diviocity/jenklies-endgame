@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -5,10 +6,22 @@ import { VitePWA } from 'vite-plugin-pwa';
 // GitHub Pages serves the site from /<repo>/.
 const base = process.env.BASE_PATH ?? '/jenklies-endgame/';
 
+/** Short commit code for the build stamp (GitHub Actions provides the full SHA). */
+function buildCode(): string {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7);
+  try {
+    return execSync('git rev-parse --short=7 HEAD').toString().trim();
+  } catch {
+    return 'local';
+  }
+}
+
 export default defineConfig({
   base,
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? 'dev'),
+    __BUILD_CODE__: JSON.stringify(buildCode()),
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
   plugins: [
     preact(),

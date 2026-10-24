@@ -230,6 +230,21 @@ export function BackLink() {
   );
 }
 
+/** Which build is running, e.g. "Build 2c20dc2 · Oct 24, 5:43 PM". */
+export function BuildStamp() {
+  const built = new Date(__BUILD_TIME__).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  return (
+    <p class="hint center mono build-stamp">
+      Build {__BUILD_CODE__} · {built}
+    </p>
+  );
+}
+
 export function Empty(props: { children: ComponentChildren }) {
   return <div class="empty">{props.children}</div>;
 }

@@ -6,10 +6,12 @@ import '@fontsource/jetbrains-mono/latin-700.css';
 import './styles.css';
 import { render } from 'preact';
 import { registerSW } from 'virtual:pwa-register';
+import { watchScreen } from './screen';
 import { init } from './store';
 import { App } from './ui/App';
 
 registerSW({ immediate: true });
+watchScreen();
 
 // Ask the browser not to evict our data under storage pressure.
 void navigator.storage?.persist?.().catch(() => false);

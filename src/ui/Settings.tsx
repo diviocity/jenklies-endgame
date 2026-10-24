@@ -7,7 +7,8 @@ import { BUCKET_LABELS, formatDateTime, inputToMinutes, minutesToInput, WEEKDAY_
 import { getState, importBackup, run, useStore } from '../store';
 import type { BucketId, Settings } from '../types';
 import { canIgnoreSilentMode } from '../sound';
-import { BackLink, confirmDialog, PageTitle, report, toast } from './common';
+import { screenReport } from '../screen';
+import { BackLink, BuildStamp, confirmDialog, PageTitle, report, toast } from './common';
 
 export function SettingsPage() {
   const state = useStore();
@@ -103,7 +104,12 @@ export function SettingsPage() {
           </button>
         )}
       </section>
-      <p class="hint center mono">v{__APP_VERSION__}</p>
+      <section class="panel">
+        <h3 class="section-label">Screen</h3>
+        <p class="hint">What this device reports about its screen. Handy for troubleshooting layout.</p>
+        <pre class="screen-report">{screenReport().join('\n')}</pre>
+      </section>
+      <BuildStamp />
     </div>
   );
 }
