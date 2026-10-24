@@ -28,7 +28,7 @@ Stack: Vite, TypeScript and Preact, with IndexedDB through `idb`, and `vite-plug
 - `src/store.ts` and `src/db.ts`: in-memory state, saving and loading.
 - `src/ui/`: the screens.
 
-**Deploying:** `.github/workflows/deploy.yml` tests, builds and publishes `dist/` to GitHub Pages on every push to `main`. One-time setup: repo **Settings → Pages → Source: GitHub Actions**. The site is served from `/jenklies-endgame/`; set `BASE_PATH` when building for a different path.
+**Deploying:** `.github/workflows/deploy.yml` tests, builds and publishes `dist/` to GitHub Pages on every push to `main`. One-time setup: repo **Settings → Pages → Source: GitHub Actions**. The site is served from `/jenklies-endgame/`; set `BASE_PATH` when building for a different path. Other hosting options (private repo, Cloudflare Pages, Namecheap cPanel) are written up in [docs/hosting.md](docs/hosting.md).
 
 ## Design decisions
 
