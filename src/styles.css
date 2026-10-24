@@ -46,8 +46,9 @@
 html,
 body {
   margin: 0;
-  height: 100%;
-  overflow: hidden;
+  /* Not 100%: in the installed iPhone app that comes out one status bar short, and
+     clipping to it (overflow: hidden) cut off the bottom of the tab bar. */
+  height: var(--app-h);
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
