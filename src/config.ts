@@ -1,11 +1,15 @@
 // Every tunable number in the game lives here.
 
 export const ECONOMY = {
-  /** Sparks for a full week of tasks without any on-time bonuses. */
-  weeklyBaseTarget: 20_000,
-  /** On-time bonus as a fraction of a task's base value (30,000 for a perfect week). */
-  bonusRatio: 0.5,
-  /** Task values are rounded to the nearest multiple of this. */
+  /** Sparks for a perfect week: every task done, every task and bucket on time (80 pulls). */
+  perfectWeekTarget: 40_000,
+  /** Share of a perfect week paid out as bucket bonuses; the rest is paid per task. */
+  bucketShare: 0.75,
+  /** Share of each bucket's bonus that is only paid if every task in it was on time. */
+  bucketPerfectShare: 0.5,
+  /** A task's on-time bonus as a fraction of its base value. */
+  taskOnTimeRatio: 0.2,
+  /** Values are rounded to the nearest multiple of this. */
   roundTo: 10,
   /** No task is ever worth less than this many base Sparks. */
   minBase: 10,

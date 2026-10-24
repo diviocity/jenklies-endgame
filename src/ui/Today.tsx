@@ -1,6 +1,14 @@
 import { useState } from 'preact/hooks';
-import { addOneOff, completeTask, removeOneOff, today, undoTask } from '../logic/actions';
-import { taskValues } from '../logic/rewards';
+import {
+  addOneOff,
+  bucketStatus,
+  completeTask,
+  dayTotals,
+  oneOffValues,
+  removeOneOff,
+  today,
+  undoTask,
+} from '../logic/actions';
 import { BUCKET_LABELS, deadlineAt, formatDayKey, formatMinutes, formatTime, inputToMinutes } from '../logic/time';
 import { play } from '../sound';
 import { run, useStore } from '../store';
@@ -22,8 +30,7 @@ export function Today() {
   if (!day) return <div class="boot">Starting the day…</div>;
 
   const done = day.tasks.filter((t) => t.completedAt);
-  const earned = done.reduce((s, t) => s + t.base + (t.onTime ? t.bonus : 0), 0);
-  const possible = day.tasks.reduce((s, t) => s + t.base + t.bonus, 0);
+  const { earned, max: possible } = dayTotals(day);
   const pct = day.tasks.length ? Math.round((done.length / day.tasks.length) * 100) : 0;
 
   return (
@@ -73,8 +80,8 @@ function BucketCard(props: { day: DayRecord; bucket: DayBucket; index: number; n
   const tasks = day.tasks.filter((t) => t.bucket === bucket.id).sort((a, b) => a.order - b.order);
   const due = deadlineAt(day.id, bucket.deadline).getTime() + 60_000;
   const open = now.getTime() < due;
-  const doneCount = tasks.filter((t) => t.completedAt).length;
-  const complete = tasks.length > 0 && doneCount === tasks.length;
+  const status = bucketStatus(day, bucket.id);
+  const complete = tasks.length > 0 && tasks.every((t) => t.completedAt);
 
   return (
     <section class={`bucket panel ${complete ? 'complete' : ''}`}>
@@ -88,6 +95,7 @@ function BucketCard(props: { day: DayRecord; bucket: DayBucket; index: number; n
           <small>by {formatMinutes(bucket.deadline)}</small>
         </div>
       </header>
+      {status.counted.length > 0 && status.bonus + status.perfectBonus > 0 && <BucketReward status={status} now={now} day={day} />}
       {tasks.length === 0 ? (
         <Empty>No tasks in this bucket.</Empty>
       ) : (
@@ -101,12 +109,46 @@ function BucketCard(props: { day: DayRecord; bucket: DayBucket; index: number; n
   );
 }
 
+/** The bucket's two bonuses: one for clearing it, one more if every task was on time. */
+function BucketReward({ status, now, day }: { status: ReturnType<typeof bucketStatus>; now: Date; day: DayRecord }) {
+  const doneCount = status.counted.filter((t) => t.completedAt).length;
+  const missed = status.counted.some(
+    (t) => (t.completedAt && !t.onTime) || (!t.completedAt && now.getTime() >= deadlineAt(day.id, t.deadline).getTime() + 60_000),
+  );
+  const perfectState = status.perfect ? 'earned' : missed ? 'lost' : 'pending';
+  return (
+    <div class="bucket-reward">
+      <span class={`reward-chip clear ${status.cleared ? 'earned' : ''}`}>
+        <span class="reward-label">{status.cleared ? '✓ Cleared' : `Clear ${doneCount}/${status.counted.length}`}</span>
+        <b>+{fmt(status.bonus)}</b>
+      </span>
+      <span class={`reward-chip perfect ${perfectState}`}>
+        <span class="reward-label">
+          {perfectState === 'earned' ? '✓ Perfect' : perfectState === 'lost' ? 'Perfect missed' : 'All on time'}
+        </span>
+        <b>+{fmt(status.perfectBonus)}</b>
+      </span>
+    </div>
+  );
+}
+
 function TaskRow({ task, bucketDeadline }: { task: DayTask; bucketDeadline: number }) {
   const { sparksName } = names();
   const complete = async () => {
     play('complete');
     const result = report(await run((s, now) => completeTask(s, task.id, now)));
-    if (result) toast(`+${result.earned} ${sparksName}${result.onTime ? ' · on time' : ''}`, 'good');
+    if (!result) return;
+    toast(`+${result.earned} ${sparksName}${result.onTime ? ' · on time' : ''}`, 'good');
+    if (result.cleared) {
+      play('clear');
+      const label = BUCKET_LABELS[task.bucket];
+      toast(
+        result.perfect
+          ? `${label} perfect! +${fmt(result.cleared + result.perfect)} ${sparksName}`
+          : `${label} cleared! +${fmt(result.cleared)} ${sparksName}`,
+        'good',
+      );
+    }
   };
   const undo = async () => {
     play('undo');
@@ -169,7 +211,7 @@ function OneOffSheet({ day, onClose }: { day: DayRecord; onClose: () => void }) 
   const [name, setName] = useState('');
   const [bucket, setBucket] = useState<BucketId>(day.buckets[day.buckets.length - 1].id);
   const [deadline, setDeadline] = useState('');
-  const value = taskValues(1, day.baseRate);
+  const value = oneOffValues(day);
 
   const save = async (e: Event) => {
     e.preventDefault();
@@ -200,7 +242,7 @@ function OneOffSheet({ day, onClose }: { day: DayRecord; onClose: () => void }) 
           <input type="time" value={deadline} onInput={(e) => setDeadline(e.currentTarget.value)} />
         </label>
         <p class="hint">
-          Worth +{value.base} (+{value.bonus} on time), today only.
+          Worth +{value.base} (+{value.bonus} on time), today only. One-off tasks don't affect bucket bonuses.
         </p>
         <button class="btn primary wide" type="submit">
           Add to today

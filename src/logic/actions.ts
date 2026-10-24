@@ -1,9 +1,10 @@
-import { PULLS, SHARDS } from '../config';
+import { ECONOMY, PULLS, SHARDS } from '../config';
 import type {
   Affirmation,
   AppState,
   BucketId,
   Change,
+  DayBucket,
   DayRecord,
   DayTask,
   Indulgence,
@@ -16,7 +17,7 @@ import type {
 } from '../types';
 import { pickIndex, rollRarity, type Rng } from './gacha';
 import { newId } from './ids';
-import { baseRate, taskValues } from './rewards';
+import { bucketValues, rates, taskValues } from './rewards';
 import { getMeta, put, sortByOrder } from './state';
 import {
   BUCKET_LABELS,
@@ -91,33 +92,43 @@ export function today(state: AppState, now: Date): DayRecord | undefined {
 
 // ---------------------------------------------------------------- days
 
+/** Days snapshotted before bucket bonuses paid 50% of a task's base for being on time. */
+const LEGACY_ON_TIME_RATIO = 0.5;
+
 /** Builds a day's snapshot from the current template, settings and reward values. */
 export function buildDay(state: AppState, key: string, now: Date): DayRecord {
   const { settings } = getMeta(state);
   const template = [...state.templateTasks.values()];
-  const rate = baseRate(template);
+  const rate = rates(template);
   const weekday = weekdayOf(key);
   const dayType = dayTypeOf(key);
-  const tasks: DayTask[] = sortByOrder(template)
-    .filter((t) => t.days.includes(weekday) && bucketDayType(t.bucket) === dayType)
-    .map((t, i) => ({
-      id: newId(),
-      templateTaskId: t.id,
-      name: t.name,
-      bucket: t.bucket,
-      deadline: t.deadlineOverride ?? settings.deadlines[t.bucket],
-      weight: t.weight,
-      ...taskValues(t.weight, rate),
-      oneOff: false,
-      order: i,
-      completedAt: null,
-      onTime: null,
-    }));
+  const todays = sortByOrder(template).filter(
+    (t) => t.days.includes(weekday) && bucketDayType(t.bucket) === dayType,
+  );
+  const tasks: DayTask[] = todays.map((t, i) => ({
+    id: newId(),
+    templateTaskId: t.id,
+    name: t.name,
+    bucket: t.bucket,
+    deadline: t.deadlineOverride ?? settings.deadlines[t.bucket],
+    weight: t.weight,
+    ...taskValues(t.weight, rate.task),
+    oneOff: false,
+    order: i,
+    completedAt: null,
+    onTime: null,
+  }));
+  const buckets: DayBucket[] = bucketsFor(dayType).map((id) => {
+    const weight = todays.filter((t) => t.bucket === id).reduce((sum, t) => sum + t.weight, 0);
+    const values = weight > 0 ? bucketValues(weight, rate.bucket) : { bonus: 0, perfectBonus: 0 };
+    return { id, deadline: settings.deadlines[id], ...values };
+  });
   return {
     id: key,
     dayType,
-    baseRate: rate,
-    buckets: bucketsFor(dayType).map((id) => ({ id, deadline: settings.deadlines[id] })),
+    baseRate: rate.task,
+    onTimeRatio: ECONOMY.taskOnTimeRatio,
+    buckets,
     tasks,
     createdAt: now.toISOString(),
   };
@@ -128,6 +139,46 @@ export function ensureDay(state: AppState, now: Date): Change[] {
   const key = dayKeyOf(now);
   if (state.days.has(key)) return [];
   return [put('days', buildDay(state, key, now))];
+}
+
+export interface BucketStatus {
+  bucket: DayBucket;
+  /** The template tasks that decide the bucket bonus (one-off tasks don't count). */
+  counted: DayTask[];
+  cleared: boolean;
+  perfect: boolean;
+  bonus: number;
+  perfectBonus: number;
+}
+
+export function bucketStatus(day: DayRecord, bucketId: BucketId): BucketStatus {
+  const bucket = day.buckets.find((b) => b.id === bucketId)!;
+  const counted = day.tasks.filter((t) => t.bucket === bucketId && !t.oneOff);
+  const cleared = counted.length > 0 && counted.every((t) => t.completedAt);
+  return {
+    bucket,
+    counted,
+    cleared,
+    perfect: cleared && counted.every((t) => t.onTime),
+    bonus: bucket.bonus ?? 0,
+    perfectBonus: bucket.perfectBonus ?? 0,
+  };
+}
+
+/** What a day has earned so far, and the most it could earn. */
+export function dayTotals(day: DayRecord): { earned: number; max: number } {
+  let earned = 0;
+  let max = 0;
+  for (const t of day.tasks) {
+    max += t.base + t.bonus;
+    if (t.completedAt) earned += t.base + (t.onTime ? t.bonus : 0);
+  }
+  for (const b of day.buckets) {
+    const s = bucketStatus(day, b.id);
+    if (s.counted.length > 0) max += s.bonus + s.perfectBonus;
+    if (s.cleared) earned += s.bonus + (s.perfect ? s.perfectBonus : 0);
+  }
+  return { earned, max };
 }
 
 function requireToday(state: AppState, now: Date): DayRecord {
@@ -146,41 +197,67 @@ function withTask(day: DayRecord, task: DayTask): DayRecord {
   return { ...day, tasks: day.tasks.map((t) => (t.id === task.id ? task : t)) };
 }
 
-export function completeTask(
-  state: AppState,
-  taskId: string,
-  now: Date,
-): ActionResult<{ earned: number; onTime: boolean }> {
+export interface CompleteResult {
+  /** Sparks from the task itself (base, plus its on-time bonus). */
+  earned: number;
+  onTime: boolean;
+  /** Bucket bonuses this completion unlocked (0 if it didn't clear the bucket). */
+  cleared: number;
+  perfect: number;
+}
+
+export function completeTask(state: AppState, taskId: string, now: Date): ActionResult<CompleteResult> {
   const day = requireToday(state, now);
   const task = findTask(day, taskId);
   if (task.completedAt) throw new ActionError('Already done.');
   const onTime = isOnTime(now, day.id, task.deadline);
   const at = now.toISOString();
+  const updated = withTask(day, { ...task, completedAt: at, onTime });
+  const label = BUCKET_LABELS[task.bucket];
+  const base = { at, currency: 'sparks' as const, dayKey: day.id };
   const changes: Change[] = [
-    put('days', withTask(day, { ...task, completedAt: at, onTime })),
-    ledger({ at, currency: 'sparks', amount: task.base, reason: 'task', note: task.name, dayKey: day.id, taskId }),
+    put('days', updated),
+    ledger({ ...base, amount: task.base, reason: 'task', note: task.name, taskId }),
   ];
   if (onTime && task.bonus > 0) {
-    changes.push(
-      ledger({
-        at,
-        currency: 'sparks',
-        amount: task.bonus,
-        reason: 'bonus',
-        note: `On time: ${task.name}`,
-        dayKey: day.id,
-        taskId,
-      }),
-    );
+    changes.push(ledger({ ...base, amount: task.bonus, reason: 'bonus', note: `On time: ${task.name}`, taskId }));
   }
-  return done(changes, { earned: task.base + (onTime ? task.bonus : 0), onTime });
+
+  const result: CompleteResult = { earned: task.base + (onTime ? task.bonus : 0), onTime, cleared: 0, perfect: 0 };
+  const before = bucketStatus(day, task.bucket);
+  const after = bucketStatus(updated, task.bucket);
+  if (after.cleared && !before.cleared) {
+    if (after.bonus > 0) {
+      result.cleared = after.bonus;
+      changes.push(
+        ledger({ ...base, amount: after.bonus, reason: 'bucket', note: `${label} cleared`, bucketId: task.bucket }),
+      );
+    }
+    if (after.perfect && after.perfectBonus > 0) {
+      result.perfect = after.perfectBonus;
+      changes.push(
+        ledger({
+          ...base,
+          amount: after.perfectBonus,
+          reason: 'bucket_perfect',
+          note: `${label} perfect`,
+          bucketId: task.bucket,
+        }),
+      );
+    }
+  }
+  return done(changes, result);
 }
 
 export function undoTask(state: AppState, taskId: string, now: Date): ActionResult<{ refunded: number }> {
   const day = requireToday(state, now);
   const task = findTask(day, taskId);
   if (!task.completedAt) throw new ActionError('That task is not done.');
-  const amount = task.base + (task.onTime ? task.bonus : 0);
+  const taskAmount = task.base + (task.onTime ? task.bonus : 0);
+  // Undoing a task in a cleared bucket also takes back the bucket's bonuses.
+  const status = task.oneOff ? null : bucketStatus(day, task.bucket);
+  const bucketAmount = status?.cleared ? status.bonus + (status.perfect ? status.perfectBonus : 0) : 0;
+  const amount = taskAmount + bucketAmount;
   const { sparks } = balances(state);
   if (sparks < amount) {
     throw new ActionError(
@@ -188,13 +265,27 @@ export function undoTask(state: AppState, taskId: string, now: Date): ActionResu
     );
   }
   const at = now.toISOString();
-  return done(
-    [
-      put('days', withTask(day, { ...task, completedAt: null, onTime: null })),
-      ledger({ at, currency: 'sparks', amount: -amount, reason: 'undo', note: `Undo: ${task.name}`, dayKey: day.id, taskId }),
-    ],
-    { refunded: amount },
-  );
+  const base = { at, currency: 'sparks' as const, reason: 'undo' as const, dayKey: day.id };
+  const changes: Change[] = [
+    put('days', withTask(day, { ...task, completedAt: null, onTime: null })),
+    ledger({ ...base, amount: -taskAmount, note: `Undo: ${task.name}`, taskId }),
+  ];
+  if (bucketAmount > 0) {
+    changes.push(
+      ledger({
+        ...base,
+        amount: -bucketAmount,
+        note: `Undo: ${BUCKET_LABELS[task.bucket]} bonus`,
+        bucketId: task.bucket,
+      }),
+    );
+  }
+  return done(changes, { refunded: amount });
+}
+
+/** What a one-off task is worth on a given day (a weight-1 task at that day's rate). */
+export function oneOffValues(day: DayRecord): { base: number; bonus: number } {
+  return taskValues(1, day.baseRate, day.onTimeRatio ?? LEGACY_ON_TIME_RATIO);
 }
 
 export function addOneOff(
@@ -216,7 +307,7 @@ export function addOneOff(
     bucket: input.bucket,
     deadline: input.deadline ?? bucketDeadline,
     weight: 1,
-    ...taskValues(1, day.baseRate),
+    ...oneOffValues(day),
     oneOff: true,
     order: Math.max(-1, ...day.tasks.map((t) => t.order)) + 1,
     completedAt: null,

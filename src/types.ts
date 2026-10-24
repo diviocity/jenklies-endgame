@@ -56,6 +56,10 @@ export interface DayTask {
 export interface DayBucket {
   id: BucketId;
   deadline: Minutes;
+  /** Paid when every (non-one-off) task in the bucket is done. Missing on days from before bucket bonuses. */
+  bonus?: number;
+  /** Paid on top of `bonus` if every one of those tasks was on time. */
+  perfectBonus?: number;
 }
 
 /** A snapshot of one day's tasks and values, taken the first time the app sees that day. */
@@ -65,12 +69,22 @@ export interface DayRecord {
   dayType: DayType;
   /** Base Sparks per unit of weight on this day (used to value one-off tasks). */
   baseRate: number;
+  /** A task's on-time bonus as a fraction of its base on this day. Missing on older days, which used 0.5. */
+  onTimeRatio?: number;
   buckets: DayBucket[];
   tasks: DayTask[];
   createdAt: string;
 }
 
-export type LedgerReason = 'task' | 'bonus' | 'undo' | 'pull' | 'pull_shards' | 'shop';
+export type LedgerReason =
+  | 'task'
+  | 'bonus'
+  | 'bucket'
+  | 'bucket_perfect'
+  | 'undo'
+  | 'pull'
+  | 'pull_shards'
+  | 'shop';
 
 export interface LedgerEntry {
   id: string;
@@ -82,6 +96,7 @@ export interface LedgerEntry {
   note: string;
   dayKey?: string;
   taskId?: string;
+  bucketId?: BucketId;
   pullId?: string;
   purchaseId?: string;
 }
