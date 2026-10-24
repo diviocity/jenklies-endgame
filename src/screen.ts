@@ -25,10 +25,19 @@ export function fitToScreen(): void {
   }
 }
 
+/**
+ * The page is now taller than the height iOS reports, so in the installed app it could
+ * scroll by a status bar's worth. Content scrolls inside the app, so keep the page itself at the top.
+ */
+function keepPageAtTop(): void {
+  if (isStandalone() && (scrollX !== 0 || scrollY !== 0)) scrollTo(0, 0);
+}
+
 export function watchScreen(): void {
   fitToScreen();
   addEventListener('resize', fitToScreen);
   addEventListener('orientationchange', fitToScreen);
+  addEventListener('scroll', keepPageAtTop, { passive: true });
 }
 
 /** Measures a CSS length by applying it to a hidden element. */
@@ -54,5 +63,6 @@ export function screenReport(): string[] {
     `100% ${document.documentElement.clientHeight} · 100vh ${measure('height:100vh', height)} · 100dvh ${measure('height:100dvh', height)}`,
     `safe area top ${measure('padding-top:env(safe-area-inset-top)', pad('top'))} · bottom ${measure('padding-bottom:env(safe-area-inset-bottom)', pad('bottom'))}`,
     `app height ${Math.round(app?.height ?? 0)} · tab bar bottom ${Math.round(tabbar?.bottom ?? 0)}`,
+    `page height ${document.documentElement.scrollHeight} · page scrolled ${Math.round(scrollY)}`,
   ];
 }
