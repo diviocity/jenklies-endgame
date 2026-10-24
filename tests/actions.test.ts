@@ -4,8 +4,10 @@ import {
   addOneOff,
   affirmationCounts,
   balances,
+  bucketStatus,
   buy,
   completeTask,
+  dayTotals,
   ensureDay,
   inventory,
   pull,
@@ -55,7 +57,12 @@ describe('days', () => {
     expect(day.tasks.map((t) => t.name)).toContain('CrossFit');
     expect(day.tasks.map((t) => t.name)).not.toContain('Shoulder PT');
     expect(day.tasks).toHaveLength(12);
-    expect(day.tasks.every((t) => t.base === 240 && t.bonus === 120)).toBe(true);
+    expect(day.tasks.every((t) => t.base === 100 && t.bonus === 20)).toBe(true);
+    expect(day.buckets.map((b) => [b.id, b.bonus, b.perfectBonus])).toEqual([
+      ['morning', 900, 900],
+      ['afternoon', 720, 720],
+      ['evening', 540, 540],
+    ]);
     expect(taskNamed(state, 'Brush teeth + wind down').deadline).toBe(22 * 60);
   });
 
@@ -71,12 +78,12 @@ describe('days', () => {
     run(state, saveTemplateTask(state, { name: 'New', days: [1, 2, 3, 4, 5], bucket: 'morning', deadlineOverride: null, weight: 10 }));
     applyChanges(state, ensureDay(state, at(12)));
     expect(today(state, at(12))!.tasks).toHaveLength(12);
-    expect(taskNamed(state, 'Shower').base).toBe(240);
+    expect(taskNamed(state, 'Shower').base).toBe(100);
     // Tomorrow picks up the new template.
     applyChanges(state, ensureDay(state, at(5, 0, 21)));
     const tomorrow = today(state, at(5, 0, 21))!;
     expect(tomorrow.tasks).toHaveLength(13);
-    expect(tomorrow.tasks.find((t) => t.name === 'Shower')!.base).toBe(150); // 20000 / 133
+    expect(tomorrow.tasks.find((t) => t.name === 'Shower')!.base).toBe(60); // 10000 / 1.2 / 133
   });
 });
 
@@ -84,14 +91,14 @@ describe('completing tasks', () => {
   it('earns base + bonus on time', () => {
     const state = setup();
     const result = run(state, completeTask(state, taskNamed(state, 'Shower').id, at(8, 30)));
-    expect(result).toEqual({ earned: 360, onTime: true });
-    expect(balances(state).sparks).toBe(360);
+    expect(result).toEqual({ earned: 120, onTime: true, cleared: 0, perfect: 0 });
+    expect(balances(state).sparks).toBe(120);
   });
 
   it('earns base only after the deadline', () => {
     const state = setup();
     const result = run(state, completeTask(state, taskNamed(state, 'Shower').id, at(9, 1)));
-    expect(result).toEqual({ earned: 240, onTime: false });
+    expect(result).toEqual({ earned: 100, onTime: false, cleared: 0, perfect: 0 });
   });
 
   it('uses the task deadline override', () => {
@@ -104,7 +111,7 @@ describe('completing tasks', () => {
     const state = setup();
     const id = taskNamed(state, 'Feed the dog').id;
     expect(run(state, completeTask(state, id, at(2, 0, 21))).onTime).toBe(false);
-    expect(balances(state).sparks).toBe(240);
+    expect(balances(state).sparks).toBe(100);
   });
 
   it('locks a day once 4 AM passes', () => {
@@ -122,7 +129,7 @@ describe('completing tasks', () => {
     expect(balances(state).sparks).toBe(0);
     expect(taskNamed(state, 'Shower').completedAt).toBeNull();
     // Re-completing now is late.
-    expect(run(state, completeTask(state, id, at(10))).earned).toBe(240);
+    expect(run(state, completeTask(state, id, at(10))).earned).toBe(100);
   });
 
   it('blocks undo when the Sparks are already spent', () => {
@@ -137,8 +144,112 @@ describe('completing tasks', () => {
     const state = setup();
     run(state, addOneOff(state, { name: 'Call the vet', bucket: 'afternoon', deadline: null }, at(11)));
     const task = taskNamed(state, 'Call the vet');
-    expect(task).toMatchObject({ oneOff: true, base: 240, bonus: 120, deadline: 17 * 60 });
+    expect(task).toMatchObject({ oneOff: true, base: 100, bonus: 20, deadline: 17 * 60 });
     expect(() => addOneOff(state, { name: 'x', bucket: 'half1', deadline: null }, at(11))).toThrow(ActionError);
+  });
+});
+
+describe('bucket bonuses', () => {
+  const MORNING = ['Up at 5:30', 'CrossFit', 'Shower', 'Breakfast + BP meds', 'Brush teeth'];
+
+  function completeAll(state: AppState, names: string[], when: (i: number) => Date) {
+    return names.map((name, i) => run(state, completeTask(state, taskNamed(state, name).id, when(i))));
+  }
+
+  it('pays the clear bonus and the perfect bonus when the last task lands on time', () => {
+    const state = setup();
+    const results = completeAll(state, MORNING, () => at(8));
+    expect(results.slice(0, 4).every((r) => r.cleared === 0)).toBe(true);
+    expect(results[4]).toMatchObject({ cleared: 900, perfect: 900 });
+    expect(balances(state).sparks).toBe(5 * 120 + 1800); // the agreed 2,400 for a perfect morning
+  });
+
+  it('pays only the clear bonus when any task was late', () => {
+    const state = setup();
+    completeAll(state, MORNING, (i) => (i === 2 ? at(9, 30) : at(8)));
+    expect(balances(state).sparks).toBe(4 * 120 + 100 + 900); // 1,480
+  });
+
+  it('pays no bucket bonus until every task is done', () => {
+    const state = setup();
+    completeAll(state, MORNING.slice(0, 4), () => at(8));
+    expect(balances(state).sparks).toBe(4 * 120);
+  });
+
+  it('matches the agreed weekday scenarios', () => {
+    const all = (state: AppState) => today(state, at(7))!.tasks.map((t) => t.name);
+    const perfect = setup();
+    completeAll(perfect, all(perfect), () => at(7));
+    expect(balances(perfect).sparks).toBe(5_760);
+
+    const oneLate = setup();
+    completeAll(oneLate, all(oneLate), (i) => (i === 0 ? at(9, 15) : at(7)));
+    expect(balances(oneLate).sparks).toBe(4_840);
+
+    const oneSkipped = setup();
+    completeAll(oneSkipped, all(oneSkipped).slice(1), () => at(7));
+    expect(balances(oneSkipped).sparks).toBe(3_840);
+
+    const allLate = setup();
+    completeAll(allLate, all(allLate), () => at(23));
+    expect(balances(allLate).sparks).toBe(3_360);
+  });
+
+  it('dayTotals reports what the day has earned and could earn', () => {
+    const state = setup();
+    expect(dayTotals(today(state, at(7))!)).toEqual({ earned: 0, max: 5_760 });
+    completeAll(state, MORNING, () => at(8));
+    expect(dayTotals(today(state, at(8))!).earned).toBe(2_400);
+  });
+
+  it('one-off tasks neither block nor trigger the bucket bonus', () => {
+    const state = setup();
+    run(state, addOneOff(state, { name: 'Call the vet', bucket: 'morning', deadline: null }, at(7)));
+    const results = completeAll(state, MORNING, () => at(8));
+    expect(results[4]).toMatchObject({ cleared: 900, perfect: 900 });
+    expect(run(state, completeTask(state, taskNamed(state, 'Call the vet').id, at(8))).cleared).toBe(0);
+    expect(bucketStatus(today(state, at(8))!, 'morning').perfect).toBe(true);
+  });
+
+  it('undo in a cleared bucket takes back the bucket bonuses too', () => {
+    const state = setup();
+    completeAll(state, MORNING, () => at(8));
+    const { refunded } = run(state, undoTask(state, taskNamed(state, 'Shower').id, at(10)));
+    expect(refunded).toBe(120 + 1800);
+    expect(balances(state).sparks).toBe(4 * 120);
+    // Redoing it now (late) clears the bucket again, but no longer perfect.
+    expect(run(state, completeTask(state, taskNamed(state, 'Shower').id, at(10)))).toMatchObject({
+      earned: 100,
+      cleared: 900,
+      perfect: 0,
+    });
+  });
+
+  it('blocks undo when the bucket bonus has been spent', () => {
+    const state = setup();
+    completeAll(state, MORNING, () => at(8));
+    grant(state, -2_000);
+    expect(() => undoTask(state, taskNamed(state, 'Shower').id, at(10))).toThrow(/already been spent/);
+  });
+
+  it('days saved before bucket bonuses keep their old rules', () => {
+    const state = setup();
+    const day = today(state, at(7))!;
+    // A day snapshotted by the previous version: 240 + 120 tasks, no bucket bonuses.
+    applyChanges(state, [
+      put('days', {
+        ...day,
+        baseRate: 20_000 / 83,
+        onTimeRatio: undefined,
+        buckets: day.buckets.map(({ id, deadline }) => ({ id, deadline })),
+        tasks: day.tasks.map((t) => ({ ...t, base: 240, bonus: 120 })),
+      }),
+    ]);
+    const results = completeAll(state, MORNING, () => at(8));
+    expect(results[4]).toMatchObject({ earned: 360, cleared: 0, perfect: 0 });
+    expect(balances(state).sparks).toBe(5 * 360);
+    run(state, addOneOff(state, { name: 'Errand', bucket: 'evening', deadline: null }, at(9)));
+    expect(taskNamed(state, 'Errand')).toMatchObject({ base: 240, bonus: 120 });
   });
 });
 

@@ -35,14 +35,15 @@ Stack: Vite, TypeScript and Preact, with IndexedDB through `idb`, and `vite-plug
 These fill gaps in the brief:
 
 1. **A 5★ does not reset the 4★ counter.** That matches the brief's "a 4★ about every 8" (resetting would give about 8.5). A 5★ still counts as the "4★ or higher" for the 10-pull guarantee.
-2. **Undo is blocked if those Sparks are already spent** (the balance never goes negative).
+2. **Undo is blocked if those Sparks are already spent** (the balance never goes negative). Undoing a task in a cleared bucket also takes back that bucket's bonuses.
 3. **Each template task is either a weekday task or a weekend task**, because the bucket names differ. Tasks like "Up at 5:30" have one entry for each.
-4. **One-off tasks** have weight 1, are valued at that day's rate, and don't count toward the weekly total.
+4. **One-off tasks** have weight 1, are valued at that day's rate, don't count toward the weekly total, and don't affect bucket bonuses.
 5. **Six example indulgences** are seeded so pulling works from day one. Edit or retire them.
-6. **Smallest task value:** base is never below 10, and the bonus is half the rounded base.
+6. **Smallest task value:** base is never below 10. The on-time bonus is 20% of the rounded base.
 7. **Days are locked in on first open:** the first time the app sees a day, it takes a snapshot of that day's tasks, values and deadlines. Template and deadline edits apply from the next day.
 8. **Deadlines before 4:00 AM** are treated as after midnight, the end of the same game day.
 9. **The pull animation** runs uplink → pod drop → rarity flash → reveal, about 2.7 s (3.5 s when a 5★ drops). The flash takes the color of the best result in the batch (3★ blue, 4★ purple, 5★ gold), and nothing before it hints at the rarity. Pulls are saved before the animation starts, so closing the app mid-animation loses nothing. With reduced motion turned on in iOS, the animation and flash are skipped and the results appear straight away.
+10. **Bucket bonuses are paid** the moment the bucket's last task is checked off, any time that day. "On time" for the perfect bonus means each task met its own deadline. Days saved before bucket bonuses existed keep their old values (240 + 120 per task, no bucket bonus).
 
 ---
 
@@ -95,15 +96,29 @@ All numbers live in one config so they're easy to tune.
 
 #### Earning (base currency, placeholder name "Sparks")
 
-- Weekly targets:
-  - A full week of tasks with no bonuses earns **20,000 Sparks** (40 pulls).
-  - A perfect week with every bonus earns **30,000** (60 pulls).
-- Per-task values are calculated from those targets:
-  - base = 20,000 × task weight ÷ total weekly weight, rounded to the nearest 10
-  - on-time bonus = 50% of base
-- Values are recalculated whenever the template changes. Each day's values are fixed at 4:00 AM, so editing the template mid-day doesn't change today.
-- The starting template has about 83 tasks a week, so each task is worth roughly 240 base + 120 bonus. That's about two tasks per pull.
-- Intended pace: about 1–2 five-star indulgences a week, and hard pity about every 1.5–2 weeks.
+*Revised after Phase 2: most of the value now comes from clearing whole buckets.*
+
+- A **perfect week** (every task done, every task and bucket on time) earns **40,000 Sparks** (80 pulls).
+- **Buckets are 75% of a perfect day; individual tasks are 25%.**
+- **Tasks:** each task has a base value, plus a small on-time bonus of **20% of its base**.
+- **Buckets:** clearing every task in a bucket pays a **clear bonus**. If every one of those tasks was on time, it pays the **same amount again** as a perfect bonus. Half of a bucket's value is locked behind a perfect bucket.
+- A bucket's bonus scales with the total weight of its tasks, so bigger buckets are worth more.
+- One-off tasks are worth a weight-1 task at that day's rate (100 + 20 with the starting template). They don't count toward a bucket's bonus, so adding one never puts a bonus at risk.
+- Values are recalculated whenever the template changes. Each day's values are fixed when the day starts, so editing the template mid-day doesn't change today.
+- With the starting template (83 tasks a week), each task is worth **100 + 20 on time**. The bucket bonuses (clear / perfect) are:
+
+  | Bucket | Tasks | Clear | Perfect | Perfect bucket in total |
+  |---|---|---|---|---|
+  | Weekday Morning | 5 | 900 | +900 | 2,400 |
+  | Weekday Afternoon | 4 | 720 | +720 | 1,920 |
+  | Weekday Evening | 3 | 540 | +540 | 1,440 |
+  | Saturday 1st Half | 8 | 1,450 | +1,450 | 3,860 |
+  | Saturday 2nd Half | 3 | 540 | +540 | 1,440 |
+  | Sunday 1st Half | 6 | 1,080 | +1,080 | 2,880 |
+  | Sunday 2nd Half | 6 | 1,080 | +1,080 | 2,880 |
+
+- That gives about **39,860** for a perfect week (rounding puts it just under 80 pulls) and about **23,250** (46 pulls) with every task done but nothing on time. A perfect weekday is 5,760; with everything done but late it's 3,360.
+- Pace: a perfect week gives about 2.4 five-stars (about 1.4 from pulls, plus about 1 bought with Shards) and hard pity about once a week. This is deliberately generous; most weeks won't be perfect while the habits form.
 
 #### Pulls
 

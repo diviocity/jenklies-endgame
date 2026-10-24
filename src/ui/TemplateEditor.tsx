@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { deleteTemplateTask, moveTemplateTask, saveTemplateTask, validateTemplateTask } from '../logic/actions';
-import { baseRate, taskValues, weeklyWeight } from '../logic/rewards';
+import { bucketValues, rates, taskValues, weeklyWeight } from '../logic/rewards';
 import { getMeta, sortByOrder } from '../logic/state';
 import {
   BUCKET_LABELS,
@@ -22,6 +22,19 @@ function daysLabel(days: number[], group: DayType): string {
   return all.filter((d) => days.includes(d)).map((d) => DAY_NAMES[d]).join(' ');
 }
 
+/** The bucket's clear bonus across the days it runs, e.g. "clear +900 ×2" or "clear +540–900 ×2". */
+function bucketBonusLabel(list: TemplateTask[], group: DayType, bucketRate: number): string {
+  const perDay = GROUP_DAYS[group]
+    .map((day) => list.filter((t) => t.days.includes(day)).reduce((sum, t) => sum + t.weight, 0))
+    .filter((w) => w > 0)
+    .map((w) => bucketValues(w, bucketRate).bonus);
+  if (perDay.length === 0) return 'no bonus';
+  const lo = Math.min(...perDay);
+  const hi = Math.max(...perDay);
+  const range = lo === hi ? fmt(lo) : `${fmt(lo)}–${fmt(hi)}`;
+  return `Clear +${range} · perfect +${range} more`;
+}
+
 type Draft = { id?: string; name: string; days: number[]; bucket: BucketId; deadline: string; weight: string };
 
 export function TemplateEditor() {
@@ -29,8 +42,8 @@ export function TemplateEditor() {
   const [group, setGroup] = useState<DayType>('weekday');
   const [draft, setDraft] = useState<Draft | null>(null);
   const tasks = [...state.templateTasks.values()];
-  const rate = baseRate(tasks);
-  const one = taskValues(1, rate);
+  const rate = rates(tasks);
+  const one = taskValues(1, rate.task);
   const { deadlines } = getMeta(state).settings;
 
   const edit = (t: TemplateTask) =>
@@ -50,8 +63,9 @@ export function TemplateEditor() {
       <BackLink />
       <PageTitle eyebrow="// weekly template" title="Template" />
       <p class="hint">
-        {fmt(weeklyWeight(tasks))} weighted tasks a week · weight 1 = +{one.base} (+{one.bonus} on time). Changes apply
-        from tomorrow; today is already locked in.
+        {fmt(weeklyWeight(tasks))} weighted tasks a week · weight 1 = +{one.base} (+{one.bonus} on time). Clearing a
+        bucket pays a bonus for its tasks, and the same again if every task was on time. Changes apply from tomorrow;
+        today is already locked in.
       </p>
       <Segmented
         value={group}
@@ -69,10 +83,11 @@ export function TemplateEditor() {
               <h2>{BUCKET_LABELS[bucket]}</h2>
               <span class="mono muted small">by {formatMinutes(deadlines[bucket])}</span>
             </header>
+            <p class="hint mono small">{bucketBonusLabel(list, group, rate.bucket)}</p>
             {list.length === 0 && <Empty>No tasks.</Empty>}
             <ul class="tasks editable">
               {list.map((t, i) => {
-                const v = taskValues(t.weight, rate);
+                const v = taskValues(t.weight, rate.task);
                 return (
                   <li key={t.id} class="task">
                     <button class="edit-row" onClick={() => edit(t)}>

@@ -705,6 +705,60 @@ span.r5 {
   background: var(--ok);
 }
 
+.bucket-reward {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.reward-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-2);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.reward-chip b {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.reward-chip.perfect.pending {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.reward-chip.perfect.pending b {
+  color: var(--accent);
+}
+
+.reward-chip.earned {
+  border-color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  color: var(--ok);
+}
+
+.reward-chip.earned b {
+  color: var(--ok);
+}
+
+.reward-chip.lost {
+  border-style: dashed;
+  color: var(--dim);
+}
+
+.reward-chip.lost b {
+  color: var(--dim);
+  text-decoration: line-through;
+}
+
 .tasks {
   list-style: none;
   margin: 0;
