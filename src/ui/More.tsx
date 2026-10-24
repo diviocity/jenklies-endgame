@@ -6,7 +6,7 @@ import { History } from './History';
 import { IndulgenceEditor } from './IndulgenceEditor';
 import { BackupPage, SettingsPage } from './Settings';
 import { TemplateEditor } from './TemplateEditor';
-import { PageTitle } from './common';
+import { BuildStamp, PageTitle } from './common';
 
 const PAGES = {
   history: History,
@@ -61,6 +61,7 @@ export function More({ sub, backupDue }: { sub?: string; backupDue: boolean }) {
           </li>
         ))}
       </ul>
+      <BuildStamp />
     </div>
   );
 }
