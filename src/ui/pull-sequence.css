@@ -5,7 +5,10 @@
   /* Keep in sync with SEQUENCE.flashMs in src/logic/sequence.ts. */
   --flash-ms: 650ms;
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--app-h);
   z-index: 50;
   overflow: hidden;
   background: #050608;
