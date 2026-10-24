@@ -28,7 +28,7 @@ Stack: Vite, TypeScript and Preact, with IndexedDB through `idb`, and `vite-plug
 - `src/store.ts` and `src/db.ts`: in-memory state, saving and loading.
 - `src/ui/`: the screens.
 
-**Deploying:** `.github/workflows/deploy.yml` tests, builds and publishes `dist/` to GitHub Pages on every push to `main`. One-time setup: repo **Settings → Pages → Source: GitHub Actions**. The site is served from `/jenklies-endgame/`; set `BASE_PATH` when building for a different path.
+**Deploying:** `.github/workflows/deploy.yml` tests, builds and publishes `dist/` to GitHub Pages on every push to `main`. One-time setup: repo **Settings → Pages → Source: GitHub Actions**. The site is served from `/jenklies-endgame/`; set `BASE_PATH` when building for a different path. Other hosting options (private repo, Cloudflare Pages, Namecheap cPanel) are written up in [docs/hosting.md](docs/hosting.md).
 
 ## Design decisions
 
@@ -36,7 +36,7 @@ These fill gaps in the brief:
 
 1. **A 5★ does not reset the 4★ counter.** That matches the brief's "a 4★ about every 8" (resetting would give about 8.5). A 5★ still counts as the "4★ or higher" for the 10-pull guarantee.
 2. **Undo is blocked if those Sparks are already spent** (the balance never goes negative). Undoing a task in a cleared bucket also takes back that bucket's bonuses.
-3. **Each template task is either a weekday task or a weekend task**, because the bucket names differ. Tasks like "Up at 5:30" have one entry for each.
+3. **Each template task is either a weekday task or a weekend task**, because the bucket names differ. A task that happens every day has one entry for weekdays and one for the weekend.
 4. **One-off tasks** have weight 1, are valued at that day's rate, don't count toward the weekly total, and don't affect bucket bonuses.
 5. **Six example indulgences** are seeded so pulling works from day one. Edit or retire them.
 6. **Smallest task value:** base is never below 10. The on-time bonus is 20% of the rounded base.
@@ -82,7 +82,7 @@ These fill gaps in the brief:
   - reward weight (default 1)
 - The template can be edited from inside the app: add, edit, remove and reorder tasks.
 - One-off tasks can also be added to just today.
-- A starting template based on my current schedule is in the [appendix](#appendix-starting-template).
+- A starting template based on my current schedule is built into the app (`src/logic/seed.ts`), so a fresh install starts with it.
 - Completing a task:
   - Any time during the day earns the base reward.
   - Before the bucket's deadline also earns the on-time bonus.
@@ -189,64 +189,3 @@ All numbers live in one config so they're easy to tune.
    - a skip button and a 10-pull results grid
    - respect reduced-motion settings
 3. **Later (don't build yet):** streaks, stats, calendar/history view.
-
----
-
-## Appendix: Starting template
-
-Based on my current week, with CrossFit on Tue/Thu and shoulder PT on Mon/Wed/Fri. All tasks have weight 1.
-
-### Weekdays (Mon–Fri)
-
-**Morning (by 9:00 AM)**
-- Up at 5:30
-- CrossFit (Tue, Thu) / Shoulder PT (Mon, Wed, Fri)
-- Shower
-- Breakfast + BP meds
-- Brush teeth
-
-**Afternoon (by 5:00 PM)**
-- Focus work block
-- Lunch smoothie
-- Dog walk
-- Workday done
-
-**Evening (by 9:30 PM)**
-- Feed the dog
-- Dinner (prepped meal)
-- Brush teeth + wind down *(deadline override: 10:00 PM)*
-
-### Saturday
-
-**1st Half (by 1:00 PM)**
-- Up at 5:30
-- Breakfast + BP meds
-- Brush teeth
-- Meijer run
-- Prep chicken
-- Shower
-- Lunch smoothie
-- Dog walk
-
-**2nd Half (by 9:30 PM)**
-- Feed the dog
-- Dinner (order out)
-- Brush teeth + wind down *(deadline override: 10:00 PM)*
-
-### Sunday
-
-**1st Half (by 1:00 PM)**
-- Up at 5:30
-- Breakfast + BP meds
-- Brush teeth
-- Shower
-- Lunch smoothie
-- Dog walk
-
-**2nd Half (by 9:30 PM)**
-- Meal prep (quinoa + chicken, pack 6 meals)
-- Laundry: wash + dry
-- Fold + put away laundry
-- Feed the dog
-- Dinner (prepped meal)
-- Brush teeth + wind down *(deadline override: 10:00 PM)*
