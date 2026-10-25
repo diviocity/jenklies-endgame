@@ -43,7 +43,7 @@ These fill gaps in the brief:
 7. **Days are locked in on first open:** the first time the app sees a day, it takes a snapshot of that day's tasks, values and deadlines. Template and deadline edits apply from the next day.
 8. **Deadlines before 4:00 AM** are treated as after midnight, the end of the same game day.
 9. **The pull animation** runs uplink → pod drop → rarity flash → reveal, about 2.7 s (3.5 s when a 5★ drops). The flash takes the color of the best result in the batch (3★ blue, 4★ purple, 5★ gold), and nothing before it hints at the rarity. Pulls are saved before the animation starts, so closing the app mid-animation loses nothing. With reduced motion turned on in iOS, the animation and flash are skipped and the results appear straight away.
-10. **Bucket bonuses are paid** the moment the bucket's last task is checked off, any time that day. "On time" for the perfect bonus means each task met its own deadline. Days saved before bucket bonuses existed keep their old values (240 + 120 per task, no bucket bonus).
+10. **Bucket bonuses are paid** the moment the bucket's last task is checked off, any time that day. "On time" for the perfect bonus means each task met its own deadline. On Saturdays the perfect bonus only needs every task done that day. Like other values, this is fixed when the day starts. Days saved before bucket bonuses existed keep their old values (240 + 120 per task, no bucket bonus).
 
 ---
 
@@ -117,7 +117,8 @@ All numbers live in one config so they're easy to tune.
   | Sunday 1st Half | 6 | 1,080 | +1,080 | 2,880 |
   | Sunday 2nd Half | 6 | 1,080 | +1,080 | 2,880 |
 
-- That gives about **39,860** for a perfect week (rounding puts it just under 80 pulls) and about **23,250** (46 pulls) with every task done but nothing on time. A perfect weekday is 5,760; with everything done but late it's 3,360.
+- **Saturdays are relaxed:** a Saturday bucket pays its perfect bonus as soon as every task in it is done that day, on time or not. Each task's own on-time bonus still needs its deadline. The days this applies to are set in `src/config.ts` (`perfectAnyTimeDays`).
+- That gives about **39,860** for a perfect week (rounding puts it just under 80 pulls) and about **25,240** (50 pulls) with every task done but nothing on time. A perfect weekday is 5,760; with everything done but late it's 3,360.
 - Pace: a perfect week gives about 2.4 five-stars (about 1.4 from pulls, plus about 1 bought with Shards) and hard pity about once a week. This is deliberately generous; most weeks won't be perfect while the habits form.
 
 #### Pulls

@@ -116,7 +116,8 @@ export function buildDay(state: AppState, key: string, now: Date): DayRecord {
   const buckets: DayBucket[] = bucketsFor(dayType).map((id) => {
     const weight = todays.filter((t) => t.bucket === id).reduce((sum, t) => sum + t.weight, 0);
     const values = weight > 0 ? bucketValues(weight, rate.bucket) : { bonus: 0, perfectBonus: 0 };
-    return { id, deadline: settings.deadlines[id], ...values };
+    const perfectAnyTime = ECONOMY.perfectAnyTimeDays.includes(weekday) || undefined;
+    return { id, deadline: settings.deadlines[id], ...values, perfectAnyTime };
   });
   return {
     id: key,
@@ -154,7 +155,7 @@ export function bucketStatus(day: DayRecord, bucketId: BucketId): BucketStatus {
     bucket,
     counted,
     cleared,
-    perfect: cleared && counted.every((t) => t.onTime),
+    perfect: cleared && (bucket.perfectAnyTime === true || counted.every((t) => t.onTime)),
     bonus: bucket.bonus ?? 0,
     perfectBonus: bucket.perfectBonus ?? 0,
   };
