@@ -83,6 +83,8 @@ function BucketCard(props: { day: DayRecord; bucket: DayBucket; index: number; n
   const open = now.getTime() < due;
   const status = bucketStatus(day, bucket.id);
   const complete = tasks.length > 0 && tasks.every((t) => t.completedAt);
+  // When the bucket bonus doesn't need on time, the deadline only decides each task's own bonus.
+  const windowLabel = bucket.perfectAnyTime ? 'TASK BONUS' : 'BONUS';
 
   return (
     <section class={`bucket panel ${complete ? 'complete' : ''}`}>
@@ -92,7 +94,7 @@ function BucketCard(props: { day: DayRecord; bucket: DayBucket; index: number; n
           <h2>{BUCKET_LABELS[bucket.id]}</h2>
         </div>
         <div class={`window ${open ? 'open' : 'closed'}`}>
-          {complete ? 'CLEAR' : open ? `BONUS · ${timeLeft(due - now.getTime())}` : 'BONUS CLOSED'}
+          {complete ? 'CLEAR' : open ? `${windowLabel} · ${timeLeft(due - now.getTime())}` : `${windowLabel} CLOSED`}
           <small>by {formatMinutes(bucket.deadline)}</small>
         </div>
       </header>
@@ -113,7 +115,8 @@ function BucketCard(props: { day: DayRecord; bucket: DayBucket; index: number; n
 /** The bucket's two bonuses: one for clearing it, one more if every task was on time. */
 function BucketReward({ status, now, day }: { status: ReturnType<typeof bucketStatus>; now: Date; day: DayRecord }) {
   const doneCount = status.counted.filter((t) => t.completedAt).length;
-  const missed = status.counted.some(
+  const anyTime = status.bucket.perfectAnyTime === true;
+  const missed = !anyTime && status.counted.some(
     (t) => (t.completedAt && !t.onTime) || (!t.completedAt && now.getTime() >= deadlineAt(day.id, t.deadline).getTime() + 60_000),
   );
   const perfectState = status.perfect ? 'earned' : missed ? 'lost' : 'pending';
@@ -125,7 +128,7 @@ function BucketReward({ status, now, day }: { status: ReturnType<typeof bucketSt
       </span>
       <span class={`reward-chip perfect ${perfectState}`}>
         <span class="reward-label">
-          {perfectState === 'earned' ? '✓ Perfect' : perfectState === 'lost' ? 'Perfect missed' : 'All on time'}
+          {perfectState === 'earned' ? '✓ Perfect' : perfectState === 'lost' ? 'Perfect missed' : anyTime ? 'All done today' : 'All on time'}
         </span>
         <b>+{fmt(status.perfectBonus)}</b>
       </span>

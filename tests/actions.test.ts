@@ -195,6 +195,25 @@ describe('bucket bonuses', () => {
     expect(balances(allLate).sparks).toBe(3_360);
   });
 
+  it('on Saturday a bucket pays its perfect bonus for finishing every task, even late', () => {
+    const sat = (h: number) => new Date(2026, 9, 24, h);
+    const state = setup(sat(7));
+    const day = today(state, sat(7))!;
+    expect(day.buckets.every((b) => b.perfectAnyTime)).toBe(true);
+    const names = day.tasks.filter((t) => t.bucket === 'half2').map((t) => t.name);
+    const results = names.map((name) => run(state, completeTask(state, taskNamed(state, name, sat(23)).id, sat(23))));
+    // Late, so each task earns base only, but the bucket still pays clear + perfect.
+    expect(results.at(-1)).toMatchObject({ cleared: 540, perfect: 540 });
+    expect(balances(state).sparks).toBe(names.length * 100 + 1_080);
+  });
+
+  it('Sunday and weekdays still need every task on time for the perfect bonus', () => {
+    const sun = new Date(2026, 9, 25, 7);
+    const state = setup(sun);
+    expect(today(state, sun)!.buckets.some((b) => b.perfectAnyTime)).toBe(false);
+    expect(today(setup(), at(7))!.buckets.some((b) => b.perfectAnyTime)).toBe(false);
+  });
+
   it('dayTotals reports what the day has earned and could earn', () => {
     const state = setup();
     expect(dayTotals(today(state, at(7))!)).toEqual({ earned: 0, max: 5_760 });

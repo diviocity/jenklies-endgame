@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ECONOMY } from '../src/config';
 import { bucketValues, rates, taskValues, weeklyWeight } from '../src/logic/rewards';
 import { startingTemplate } from '../src/logic/seed';
 import { bucketsFor } from '../src/logic/time';
@@ -30,7 +31,8 @@ function weekTotals(tasks: TemplateTask[]) {
       const base = b.tasks.reduce((s, t) => s + t.base, 0);
       const onTime = b.tasks.reduce((s, t) => s + t.bonus, 0);
       perfect += base + onTime + b.bonus + b.perfectBonus;
-      allLate += base + b.bonus;
+      // Saturday buckets pay the perfect bonus for finishing, on time or not.
+      allLate += base + b.bonus + (ECONOMY.perfectAnyTimeDays.includes(d) ? b.perfectBonus : 0);
     }
   }
   return { perfect, allLate };
@@ -62,8 +64,8 @@ describe('reward math', () => {
     expect(buckets / perfect).toBeCloseTo(0.75, 2);
   });
 
-  it('a week with everything done but nothing on time is about 23,250', () => {
-    expect(weekTotals(template).allLate).toBe(23_250);
+  it('a week with everything done but nothing on time is about 25,240', () => {
+    expect(weekTotals(template).allLate).toBe(25_240);
   });
 
   it('buckets are the majority of a day whether perfect or not', () => {

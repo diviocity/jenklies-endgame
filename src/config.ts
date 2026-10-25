@@ -7,6 +7,12 @@ export const ECONOMY = {
   bucketShare: 0.75,
   /** Share of each bucket's bonus that is only paid if every task in it was on time. */
   bucketPerfectShare: 0.5,
+  /**
+   * Days of the week (0 = Sunday … 6 = Saturday) whose buckets pay the perfect bonus for
+   * finishing every task that day, on time or not. Each task's own on-time bonus still
+   * needs its deadline.
+   */
+  perfectAnyTimeDays: [6] as readonly number[],
   /** A task's on-time bonus as a fraction of its base value. */
   taskOnTimeRatio: 0.2,
   /** Values are rounded to the nearest multiple of this. */

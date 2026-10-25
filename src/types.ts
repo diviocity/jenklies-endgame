@@ -77,6 +77,8 @@ export interface DayBucket {
   bonus?: number;
   /** Paid on top of `bonus` if every one of those tasks was on time. */
   perfectBonus?: number;
+  /** The perfect bonus only needs every task done that day, not on time (set when the day starts). */
+  perfectAnyTime?: boolean;
 }
 
 /** A snapshot of one day's tasks and values, taken the first time the app sees that day. */
