@@ -11,7 +11,9 @@ import {
   minutesToInput,
 } from '../logic/time';
 import { run, useStore } from '../store';
-import type { BucketId, DayType, TemplateTask } from '../types';
+import { FITNESS } from '../config';
+import { FITNESS_LABELS, FITNESS_TYPES } from '../logic/rank';
+import type { BucketId, DayType, FitnessType, TemplateTask } from '../types';
 import { BackLink, confirmDialog, Empty, fmt, PageTitle, report, Segmented, Sheet } from './common';
 
 const GROUP_DAYS: Record<DayType, number[]> = { weekday: [1, 2, 3, 4, 5], weekend: [6, 0] };
@@ -35,7 +37,15 @@ function bucketBonusLabel(list: TemplateTask[], group: DayType, bucketRate: numb
   return `Clear +${range} · perfect +${range} more`;
 }
 
-type Draft = { id?: string; name: string; days: number[]; bucket: BucketId; deadline: string; weight: string };
+type Draft = {
+  id?: string;
+  name: string;
+  days: number[];
+  bucket: BucketId;
+  deadline: string;
+  weight: string;
+  fitness: FitnessType | '';
+};
 
 export function TemplateEditor() {
   const state = useStore();
@@ -54,9 +64,10 @@ export function TemplateEditor() {
       bucket: t.bucket,
       deadline: t.deadlineOverride === null ? '' : minutesToInput(t.deadlineOverride),
       weight: String(t.weight),
+      fitness: t.fitness ?? '',
     });
   const add = (bucket: BucketId) =>
-    setDraft({ name: '', days: GROUP_DAYS[group], bucket, deadline: '', weight: '1' });
+    setDraft({ name: '', days: GROUP_DAYS[group], bucket, deadline: '', weight: '1', fitness: '' });
 
   return (
     <div class="page">
@@ -96,6 +107,7 @@ export function TemplateEditor() {
                         {daysLabel(t.days, group)} · +{v.base}/{v.bonus}
                         {t.weight !== 1 && <> · weight {t.weight}</>}
                         {t.deadlineOverride !== null && <> · by {formatMinutes(t.deadlineOverride)}</>}
+                        {t.fitness && <> · +{FITNESS.points[t.fitness]} FP</>}
                       </span>
                     </button>
                     <span class="order-btns">
@@ -147,6 +159,7 @@ function TaskSheet(props: { draft: Draft; group: DayType; onClose: () => void })
       bucket: d.bucket,
       deadlineOverride: d.deadline ? inputToMinutes(d.deadline) : null,
       weight: Number(d.weight),
+      fitness: d.fitness || null,
     };
     const problem = validateTemplateTask(input);
     if (problem) return setError(problem);
@@ -218,6 +231,17 @@ function TaskSheet(props: { draft: Draft; group: DayType; onClose: () => void })
             Use the bucket deadline instead
           </button>
         )}
+        <label>
+          <span>Fitness (Frontier Expedition)</span>
+          <select value={d.fitness} onChange={(e) => set({ fitness: e.currentTarget.value as Draft['fitness'] })}>
+            <option value="">Not a fitness task</option>
+            {FITNESS_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {FITNESS_LABELS[t]} (+{FITNESS.points[t]} points)
+              </option>
+            ))}
+          </select>
+        </label>
         {error && <p class="blocked">{error}</p>}
         <button class="btn primary wide" type="submit">
           Save

@@ -1,4 +1,4 @@
-import type { Affirmation, BucketId, Indulgence, TemplateTask } from '../types';
+import type { Affirmation, BucketId, FitnessType, Indulgence, TemplateTask } from '../types';
 import { newId } from './ids';
 
 const WEEKDAYS = [1, 2, 3, 4, 5];
@@ -43,6 +43,17 @@ const STARTING_TEMPLATE: SeedTask[] = [
   ['Brush teeth + wind down', WEEKEND, 'half2', TEN_PM],
 ];
 
+/** Template tasks that count toward the Frontier Expedition, by name (case-insensitive). */
+export const FITNESS_TAGS: Record<string, FitnessType> = {
+  crossfit: 'crossfit',
+  'shoulder pt': 'pt',
+  'dog walk': 'activity',
+};
+
+export function fitnessTagFor(name: string): FitnessType | null {
+  return FITNESS_TAGS[name.trim().toLowerCase()] ?? null;
+}
+
 export function startingTemplate(): TemplateTask[] {
   return STARTING_TEMPLATE.map(([name, days, bucket, deadlineOverride], i) => ({
     id: newId(),
@@ -52,6 +63,7 @@ export function startingTemplate(): TemplateTask[] {
     deadlineOverride: deadlineOverride ?? null,
     weight: 1,
     order: i,
+    fitness: fitnessTagFor(name),
   }));
 }
 

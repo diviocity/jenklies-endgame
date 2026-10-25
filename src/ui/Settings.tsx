@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { BACKUP } from '../config';
+import { BACKUP, FITNESS } from '../config';
 import { markBackedUp, saveSettings } from '../logic/actions';
 import { backupFileName, buildBackup, parseBackup, summarizeBackup } from '../logic/backup';
 import { getMeta } from '../logic/state';
 import { BUCKET_LABELS, formatDateTime, inputToMinutes, minutesToInput, WEEKDAY_BUCKETS, WEEKEND_BUCKETS } from '../logic/time';
 import { getState, importBackup, run, useStore } from '../store';
-import type { BucketId, Settings } from '../types';
+import type { BucketId, FitnessTarget, Settings } from '../types';
 import { canIgnoreSilentMode } from '../sound';
 import { screenReport } from '../screen';
-import { BackLink, BuildStamp, confirmDialog, PageTitle, report, toast } from './common';
+import { FITNESS_LABELS, FITNESS_TYPES, targetPoints } from '../logic/rank';
+import { BackLink, BuildStamp, confirmDialog, fmt, PageTitle, report, toast } from './common';
 
 export function SettingsPage() {
   const state = useStore();
@@ -87,6 +88,10 @@ export function SettingsPage() {
             </>
           )}
         </section>
+        <TargetWeek
+          target={s.fitnessTarget ?? { ...FITNESS.defaultTarget }}
+          onChange={(fitnessTarget) => setS({ ...s, fitnessTarget })}
+        />
         <button class="btn primary wide" type="submit" disabled={!dirty}>
           Save settings
         </button>
@@ -203,5 +208,40 @@ export function BackupPage() {
         <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={onFile} />
       </section>
     </div>
+  );
+}
+
+/** The Frontier Expedition's target week: Rank 20 means doing this consistently. */
+function TargetWeek(props: { target: FitnessTarget; onChange: (t: FitnessTarget) => void }) {
+  const total = targetPoints(props.target);
+  return (
+    <section class="panel">
+      <h3 class="section-label">Frontier Expedition · target week</h3>
+      <div class="grid3">
+        {FITNESS_TYPES.map((type) => (
+          <label key={type}>
+            <span>
+              {FITNESS_LABELS[type]} ×
+            </span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min="0"
+              max="21"
+              step="1"
+              value={props.target[type]}
+              onInput={(e) => {
+                const n = Math.max(0, Math.floor(Number(e.currentTarget.value) || 0));
+                props.onChange({ ...props.target, [type]: n });
+              }}
+            />
+          </label>
+        ))}
+      </div>
+      <p class="hint">
+        {fmt(total)} points a week. Rank 20 means doing this consistently, and your rank rescales straight away when you
+        change it (for example, when PT ends). Only {FITNESS.activityWeeklyCap} activities a week count.
+      </p>
+    </section>
   );
 }

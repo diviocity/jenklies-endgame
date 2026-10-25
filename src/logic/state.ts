@@ -1,4 +1,4 @@
-import { SCHEMA_VERSION } from '../config';
+import { FITNESS, SCHEMA_VERSION } from '../config';
 import type { AppState, Change, Meta, StoreName, StoreRecords } from '../types';
 import { STORE_NAMES } from '../types';
 import { DEFAULT_DEADLINES } from './time';
@@ -44,6 +44,7 @@ export function defaultMeta(now: string): Meta {
       soundIgnoresSilent: false,
       sparksName: 'Sparks',
       shardsName: 'Shards',
+      fitnessTarget: { ...FITNESS.defaultTarget },
     },
     pity5: 0,
     pity4: 0,

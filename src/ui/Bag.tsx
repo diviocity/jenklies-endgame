@@ -5,13 +5,15 @@ import { sortByOrder } from '../logic/state';
 import { play } from '../sound';
 import { run, useStore } from '../store';
 import type { Indulgence } from '../types';
+import { AffirmationCollection } from './Collection';
 import { Redemptions } from './History';
 import { Amount, confirmDialog, Empty, names, PageTitle, report, Segmented, Stars, toast } from './common';
 
-type View = 'inventory' | 'shop' | 'log';
+export type BagView = View;
+type View = 'inventory' | 'affirmations' | 'shop' | 'log';
 
-export function Bag() {
-  const [view, setView] = useState<View>('inventory');
+export function Bag({ view: initial = 'inventory' }: { view?: View }) {
+  const [view, setView] = useState<View>(initial);
   return (
     <div class="page">
       <PageTitle eyebrow="// storage" title="Bag" />
@@ -19,12 +21,14 @@ export function Bag() {
         value={view}
         onChange={setView}
         options={[
-          { value: 'inventory', label: 'Inventory' },
+          { value: 'inventory', label: 'Indulgences' },
+          { value: 'affirmations', label: 'Affirmations' },
           { value: 'shop', label: 'Shop' },
           { value: 'log', label: 'Redeemed' },
         ]}
       />
       {view === 'inventory' && <Inventory />}
+      {view === 'affirmations' && <AffirmationCollection />}
       {view === 'shop' && <Shop />}
       {view === 'log' && <Redemptions />}
     </div>

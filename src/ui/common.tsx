@@ -194,9 +194,10 @@ export function Segmented<T extends string>(props: {
   onChange: (v: T) => void;
 }) {
   return (
-    <div class="segmented" role="tablist">
+    <div class={`segmented ${props.options.length > 3 ? 'dense' : ''}`} role="tablist">
       {props.options.map((o) => (
         <button
+          type="button"
           key={o.value}
           role="tab"
           aria-selected={props.value === o.value}

@@ -6,6 +6,11 @@ export type Currency = 'sparks' | 'shards';
 /** Minutes after midnight of the day's date. Values past 1440 mean after midnight (up to 4 AM). */
 export type Minutes = number;
 
+export type FitnessType = 'crossfit' | 'pt' | 'workout' | 'activity';
+
+/** How many of each fitness activity make up a full target week. */
+export type FitnessTarget = Record<FitnessType, number>;
+
 export interface Settings {
   deadlines: Record<BucketId, Minutes>;
   soundOn: boolean;
@@ -13,6 +18,8 @@ export interface Settings {
   soundIgnoresSilent?: boolean;
   sparksName: string;
   shardsName: string;
+  /** The Frontier Expedition's target week (missing in data from before the event). */
+  fitnessTarget?: FitnessTarget;
 }
 
 export interface Meta {
@@ -36,6 +43,8 @@ export interface TemplateTask {
   deadlineOverride: Minutes | null;
   weight: number;
   order: number;
+  /** Checking this task off also logs this fitness activity. */
+  fitness?: FitnessType | null;
 }
 
 export interface DayTask {
@@ -51,6 +60,8 @@ export interface DayTask {
   order: number;
   completedAt: string | null;
   onTime: boolean | null;
+  /** Copied from the template when the day starts. */
+  fitness?: FitnessType | null;
 }
 
 export interface DayBucket {
@@ -154,6 +165,67 @@ export interface Affirmation {
   createdAt: string;
 }
 
+/** One fitness activity, from a tagged task or logged by hand. */
+export interface FitnessEntry {
+  id: string;
+  at: string;
+  dayKey: string;
+  /** Day key of the Monday that starts this entry's week. */
+  weekKey: string;
+  type: FitnessType;
+  /** Points before the weekly activity cap is applied. */
+  points: number;
+  source: 'task' | 'manual';
+  /** The day task that logged it (source 'task'). */
+  taskId?: string;
+  note: string;
+}
+
+/** The Frontier Expedition's running state. */
+export interface FrontierState {
+  id: 'frontier';
+  /** The first week the event tracked. */
+  startedWeek: string;
+  /** The week in progress; every earlier week has been closed. */
+  currentWeek: string;
+  /** Rank points as of the last weekly reset. */
+  rp: number;
+  rank: number;
+  /** Consecutive weak weeks so far (drives the decay rate). */
+  weakStreak: number;
+  peakRank: number;
+}
+
+/** A closed week of the Frontier Expedition: its points and what the reset did. */
+export interface EventWeek {
+  /** The week's Monday day key. */
+  id: string;
+  points: number;
+  targetPoints: number;
+  rpMax: number;
+  rpBefore: number;
+  rpAfter: number;
+  decay: number;
+  weak: boolean;
+  weakStreak: number;
+  rankBefore: number;
+  rankAfter: number;
+  closedAt: string;
+  /** Whether the weekly report for this week has been shown. */
+  seen: boolean;
+}
+
+/** An unopened (or used) indulgence selector from the expedition map. */
+export interface Selector {
+  id: string;
+  rarity: 4 | 5;
+  source: string;
+  createdAt: string;
+  usedAt: string | null;
+  indulgenceId: string | null;
+  name: string | null;
+}
+
 export interface StoreRecords {
   meta: Meta;
   templateTasks: TemplateTask;
@@ -164,6 +236,10 @@ export interface StoreRecords {
   purchases: Purchase;
   redemptions: Redemption;
   affirmations: Affirmation;
+  fitness: FitnessEntry;
+  events: FrontierState;
+  eventWeeks: EventWeek;
+  selectors: Selector;
 }
 
 export type StoreName = keyof StoreRecords;
@@ -178,6 +254,10 @@ export const STORE_NAMES: StoreName[] = [
   'purchases',
   'redemptions',
   'affirmations',
+  'fitness',
+  'events',
+  'eventWeeks',
+  'selectors',
 ];
 
 /** All app data, held in memory as id → record maps. */

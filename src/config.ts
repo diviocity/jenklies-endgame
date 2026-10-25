@@ -54,4 +54,25 @@ export const BACKUP = {
   remindAfterDays: 7,
 } as const;
 
-export const SCHEMA_VERSION = 1;
+export const FITNESS = {
+  /** Points per activity. */
+  points: { crossfit: 100, pt: 50, workout: 75, activity: 10 },
+  /** Only this many 'activity' entries per week earn points. */
+  activityWeeklyCap: 7,
+  /** Default target week: 3 CrossFit + 3 PT + 7 activities = 520 points. Editable in Settings. */
+  defaultTarget: { crossfit: 3, pt: 3, workout: 0, activity: 7 },
+} as const;
+
+export const RANK = {
+  maxRank: 20,
+  /** Normal weekly RP decay. */
+  baseDecay: 0.1,
+  /** Decay on the 1st, 2nd and 3rd-or-later consecutive weak week. */
+  weakDecay: [0.1, 0.15, 0.25],
+  /** A week is weak if its points are below this share of RP (the points needed to hold RP steady). */
+  weakThreshold: 0.1,
+  /** RP_max = rpMaxFactor × (target week points ÷ baseDecay); Rank 20 = doing the full routine. */
+  rpMaxFactor: 0.9,
+} as const;
+
+export const SCHEMA_VERSION = 2;

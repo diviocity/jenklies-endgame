@@ -10,6 +10,7 @@ import {
   undoTask,
 } from '../logic/actions';
 import { BUCKET_LABELS, deadlineAt, formatDayKey, formatMinutes, formatTime, inputToMinutes } from '../logic/time';
+import { FITNESS } from '../config';
 import { play } from '../sound';
 import { run, useStore } from '../store';
 import type { BucketId, DayBucket, DayRecord, DayTask } from '../types';
@@ -138,7 +139,8 @@ function TaskRow({ task, bucketDeadline }: { task: DayTask; bucketDeadline: numb
     play('complete');
     const result = report(await run((s, now) => completeTask(s, task.id, now)));
     if (!result) return;
-    toast(`+${result.earned} ${sparksName}${result.onTime ? ' · on time' : ''}`, 'good');
+    const fitness = result.fitness ? ` · +${result.fitness} FP` : '';
+    toast(`+${result.earned} ${sparksName}${result.onTime ? ' · on time' : ''}${fitness}`, 'good');
     if (result.cleared) {
       play('clear');
       const label = BUCKET_LABELS[task.bucket];
@@ -188,6 +190,7 @@ function TaskRow({ task, bucketDeadline }: { task: DayTask; bucketDeadline: numb
             <span class="task-sub">
               +{task.base} <span class="bonus">+{task.bonus} on time</span>
               {task.deadline !== bucketDeadline && <> · by {formatMinutes(task.deadline)}</>}
+              {task.fitness && <span class="fp"> · +{FITNESS.points[task.fitness]} FP</span>}
             </span>
           )}
         </span>

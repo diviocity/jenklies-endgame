@@ -5,13 +5,13 @@ import { getMeta } from '../logic/state';
 import { daysBetween } from '../logic/time';
 import { isReady, useStore } from '../store';
 import { Bag } from './Bag';
-import { Collection } from './Collection';
 import { Amount, UiHost } from './common';
+import { Events } from './Events';
 import { More } from './More';
 import { Pull } from './Pull';
 import { Today } from './Today';
 
-type Tab = 'today' | 'pull' | 'bag' | 'collection' | 'more';
+type Tab = 'today' | 'pull' | 'bag' | 'events' | 'more';
 
 function parseHash(): string[] {
   return location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
@@ -61,11 +61,12 @@ const TABS: { id: Tab; label: string; icon: preact.JSX.Element }[] = [
     ),
   },
   {
-    id: 'collection',
-    label: 'Collection',
+    id: 'events',
+    label: 'Events',
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z" />
+        <path d="M5 21V3M5 4h12l-3 4 3 4H5" />
+        <path d="M9 21l3-5 3 3 4-6" />
       </svg>
     ),
   },
@@ -89,7 +90,9 @@ export function App() {
   const route = useRoute();
   if (!isReady()) return <div class="boot">INITIALIZING…</div>;
 
-  const tab = (TABS.some((t) => t.id === route[0]) ? route[0] : 'today') as Tab;
+  // The Collection tab moved into the Bag; old links land there.
+  const collectionLink = route[0] === 'collection';
+  const tab = (collectionLink ? 'bag' : TABS.some((t) => t.id === route[0]) ? route[0] : 'today') as Tab;
   const { sparks, shards } = balances(state);
   const meta = getMeta(state);
   const due = backupDue(meta.lastBackupAt);
@@ -116,8 +119,8 @@ export function App() {
       <main>
         {tab === 'today' && <Today />}
         {tab === 'pull' && <Pull />}
-        {tab === 'bag' && <Bag />}
-        {tab === 'collection' && <Collection />}
+        {tab === 'bag' && <Bag view={collectionLink ? 'affirmations' : undefined} />}
+        {tab === 'events' && <Events sub={route[1]} />}
         {tab === 'more' && <More sub={route[1]} backupDue={due} />}
       </main>
       <nav class="tabbar">
