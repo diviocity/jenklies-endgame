@@ -15,8 +15,11 @@ import type {
   Settings,
   TemplateTask,
 } from '../types';
+import { ActionError, done, type ActionResult } from './errors';
+import { taskFitnessEntries, taskFitnessEntry, wouldCount } from './event';
 import { pickIndex, rollRarity, type Rng } from './gacha';
 import { newId } from './ids';
+import { targetPoints } from './rank';
 import { bucketValues, rates, taskValues } from './rewards';
 import { getMeta, put, sortByOrder } from './state';
 import {
@@ -29,17 +32,7 @@ import {
   weekdayOf,
 } from './time';
 
-/** A user-facing refusal (shown as a message, not a crash). */
-export class ActionError extends Error {}
-
-export interface ActionResult<T = undefined> {
-  changes: Change[];
-  result: T;
-}
-
-function done<T>(changes: Change[], result: T): ActionResult<T> {
-  return { changes, result };
-}
+export { ActionError, type ActionResult } from './errors';
 
 function ledger(entry: Omit<LedgerEntry, 'id'>): Change {
   return put('ledger', { id: newId(), ...entry });
@@ -117,6 +110,7 @@ export function buildDay(state: AppState, key: string, now: Date): DayRecord {
     order: i,
     completedAt: null,
     onTime: null,
+    fitness: t.fitness ?? null,
   }));
   const buckets: DayBucket[] = bucketsFor(dayType).map((id) => {
     const weight = todays.filter((t) => t.bucket === id).reduce((sum, t) => sum + t.weight, 0);
@@ -204,6 +198,8 @@ export interface CompleteResult {
   /** Bucket bonuses this completion unlocked (0 if it didn't clear the bucket). */
   cleared: number;
   perfect: number;
+  /** Fitness points the task logged (0 if untagged, or an activity past the weekly cap). */
+  fitness: number;
 }
 
 export function completeTask(state: AppState, taskId: string, now: Date): ActionResult<CompleteResult> {
@@ -223,7 +219,18 @@ export function completeTask(state: AppState, taskId: string, now: Date): Action
     changes.push(ledger({ ...base, amount: task.bonus, reason: 'bonus', note: `On time: ${task.name}`, taskId }));
   }
 
-  const result: CompleteResult = { earned: task.base + (onTime ? task.bonus : 0), onTime, cleared: 0, perfect: 0 };
+  const result: CompleteResult = {
+    earned: task.base + (onTime ? task.bonus : 0),
+    onTime,
+    cleared: 0,
+    perfect: 0,
+    fitness: 0,
+  };
+  const fitness = taskFitnessEntry(day, task, at);
+  if (fitness) {
+    if (wouldCount(state, fitness.weekKey, fitness.type)) result.fitness = fitness.points;
+    changes.push(put('fitness', fitness));
+  }
   const before = bucketStatus(day, task.bucket);
   const after = bucketStatus(updated, task.bucket);
   if (after.cleared && !before.cleared) {
@@ -279,6 +286,9 @@ export function undoTask(state: AppState, taskId: string, now: Date): ActionResu
         bucketId: task.bucket,
       }),
     );
+  }
+  for (const entry of taskFitnessEntries(state, day.id, task.id)) {
+    changes.push({ store: 'fitness', op: 'delete', id: entry.id });
   }
   return done(changes, { refunded: amount });
 }
@@ -470,6 +480,7 @@ export function saveTemplateTask(state: AppState, input: TemplateTaskInput): Act
     deadlineOverride: input.deadlineOverride,
     weight: input.weight,
     order,
+    fitness: input.fitness ?? null,
   };
   return done([put('templateTasks', task)], undefined);
 }
@@ -554,6 +565,13 @@ export function saveSettings(state: AppState, settings: Settings): ActionResult 
     if (!Number.isFinite(m) || m < 240 || m >= 1680) {
       throw new ActionError(`The ${BUCKET_LABELS[bucket as BucketId]} deadline is outside the day.`);
     }
+  }
+  if (settings.fitnessTarget) {
+    const counts = Object.values(settings.fitnessTarget);
+    if (counts.some((n) => !Number.isInteger(n) || n < 0 || n > 21)) {
+      throw new ActionError('Target week counts must be whole numbers from 0 to 21.');
+    }
+    if (targetPoints(settings.fitnessTarget) <= 0) throw new ActionError('The target week needs at least one activity.');
   }
   const sparksName = settings.sparksName.trim() || 'Sparks';
   const shardsName = settings.shardsName.trim() || 'Shards';

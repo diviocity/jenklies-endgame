@@ -1,6 +1,11 @@
 import { SCHEMA_VERSION } from '../config';
 import type { AppState, StoreName, StoreRecords } from '../types';
 import { STORE_NAMES } from '../types';
+import { migrate } from './migrate';
+import { applyChanges, emptyState } from './state';
+
+/** Stores that older backups don't have, by the data version that added them. */
+const ADDED_IN: Partial<Record<StoreName, number>> = { fitness: 2, events: 2, eventWeeks: 2, selectors: 2 };
 
 export const APP_ID = 'jenklies-endgame';
 
@@ -16,10 +21,9 @@ export interface BackupFile {
 /** Builds the export file. Its meta already records this export as the last backup. */
 export function buildBackup(state: AppState, now: Date): BackupFile {
   const exportedAt = now.toISOString();
-  const data = {} as Record<StoreName, unknown[]>;
-  for (const name of STORE_NAMES) data[name] = [...state[name].values()];
-  data.meta = (data.meta as StoreRecords['meta'][]).map((m) => ({ ...m, lastBackupAt: exportedAt }));
-  return { app: APP_ID, schemaVersion: SCHEMA_VERSION, exportedAt, data: data as BackupData };
+  const data = toData(state);
+  data.meta = data.meta.map((m) => ({ ...m, lastBackupAt: exportedAt }));
+  return { app: APP_ID, schemaVersion: SCHEMA_VERSION, exportedAt, data };
 }
 
 export function backupFileName(now: Date): string {
@@ -45,6 +49,7 @@ export function parseBackup(text: string): BackupFile {
   }
   if (!isObject(raw.data)) throw new Error('The backup has no data.');
   for (const name of STORE_NAMES) {
+    if (raw.data[name] === undefined && raw.schemaVersion < (ADDED_IN[name] ?? 0)) raw.data[name] = [];
     const records = raw.data[name];
     if (!Array.isArray(records)) throw new Error(`The backup is missing "${name}".`);
     for (const r of records) {
@@ -58,14 +63,32 @@ export function parseBackup(text: string): BackupFile {
   return raw as unknown as BackupFile;
 }
 
+function toData(state: AppState): BackupData {
+  const data = {} as Record<StoreName, unknown[]>;
+  for (const name of STORE_NAMES) data[name] = [...state[name].values()];
+  return data as BackupData;
+}
+
+/** The data to restore from a backup, upgraded to the current version. */
+export function restoredData(file: BackupFile, now: Date): BackupData {
+  const state = emptyState();
+  for (const name of STORE_NAMES) {
+    const map = state[name] as Map<string, unknown>;
+    for (const record of file.data[name] as { id: string }[]) map.set(record.id, record);
+  }
+  applyChanges(state, migrate(state, now));
+  return toData(state);
+}
+
 export function summarizeBackup(file: BackupFile): string {
   const d = file.data;
-  const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const count = (n: number, word: string, plural = `${word}s`) => `${n} ${n === 1 ? word : plural}`;
   return [
     count(d.templateTasks.length, 'template task'),
     count(d.days.length, 'day'),
     count(d.pulls.length, 'pull'),
     count(d.indulgences.length, 'indulgence'),
     count(d.affirmations.length, 'affirmation'),
+    count(d.fitness.length, 'fitness entry', 'fitness entries'),
   ].join(' · ');
 }

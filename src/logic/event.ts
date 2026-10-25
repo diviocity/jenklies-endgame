@@ -1,0 +1,208 @@
+import { FITNESS } from '../config';
+import type {
+  AppState,
+  Change,
+  DayRecord,
+  DayTask,
+  EventWeek,
+  FitnessEntry,
+  FitnessTarget,
+  FitnessType,
+  FrontierState,
+} from '../types';
+import { ActionError, done, type ActionResult } from './errors';
+import { newId } from './ids';
+import {
+  FITNESS_LABELS,
+  pointsForRank,
+  rankOf,
+  rpForRank,
+  rpMax,
+  targetPoints,
+  weekPoints,
+  weekStep,
+} from './rank';
+import { getMeta, put } from './state';
+import { addDays, dayKeyOf, weekKeyOf } from './time';
+
+export const FRONTIER_ID = 'frontier';
+
+export function fitnessTarget(state: AppState): FitnessTarget {
+  return getMeta(state).settings.fitnessTarget ?? { ...FITNESS.defaultTarget };
+}
+
+export function frontier(state: AppState): FrontierState | undefined {
+  return state.events.get(FRONTIER_ID);
+}
+
+export function entriesForWeek(state: AppState, weekKey: string): FitnessEntry[] {
+  return [...state.fitness.values()].filter((e) => e.weekKey === weekKey);
+}
+
+/** Closed weeks, oldest first. */
+export function eventHistory(state: AppState): EventWeek[] {
+  return [...state.eventWeeks.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
+}
+
+/**
+ * Starts the event if needed and runs every weekly reset that's due, including weeks
+ * the app wasn't opened (they count as zero-point weeks).
+ */
+export function ensureEvent(state: AppState, now: Date): Change[] {
+  const thisWeek = weekKeyOf(dayKeyOf(now));
+  const existing = frontier(state);
+  if (!existing) {
+    const fresh: FrontierState = {
+      id: FRONTIER_ID,
+      startedWeek: thisWeek,
+      currentWeek: thisWeek,
+      rp: 0,
+      rank: 1,
+      weakStreak: 0,
+      peakRank: 1,
+    };
+    return [put('events', fresh)];
+  }
+  if (existing.currentWeek >= thisWeek) return [];
+
+  const target = targetPoints(fitnessTarget(state));
+  const max = rpMax(target);
+  const changes: Change[] = [];
+  const event = { ...existing };
+  while (event.currentWeek < thisWeek) {
+    const points = weekPoints(entriesForWeek(state, event.currentWeek));
+    const step = weekStep(event.rp, event.weakStreak, points);
+    const rankAfter = rankOf(step.rp, max);
+    const record: EventWeek = {
+      id: event.currentWeek,
+      points,
+      targetPoints: target,
+      rpMax: max,
+      rpBefore: event.rp,
+      rpAfter: step.rp,
+      decay: step.decay,
+      weak: step.weak,
+      weakStreak: step.weakStreak,
+      rankBefore: event.rank,
+      rankAfter,
+      closedAt: now.toISOString(),
+      seen: false,
+    };
+    changes.push(put('eventWeeks', record));
+    event.rp = step.rp;
+    event.weakStreak = step.weakStreak;
+    event.rank = rankAfter;
+    event.peakRank = Math.max(event.peakRank, rankAfter);
+    event.currentWeek = addDays(event.currentWeek, 7);
+  }
+  changes.push(put('events', event));
+  return changes;
+}
+
+export interface RankStatus {
+  rank: number;
+  rp: number;
+  rpMax: number;
+  target: number;
+  /** Points earned so far this week (after the activity cap). */
+  weekPoints: number;
+  /** Rank if the week ended now. */
+  projectedRank: number;
+  /** More points needed this week to keep the current rank at the reset (0 if already safe). */
+  toHold: number;
+  /** More points needed this week to reach the next rank (null at Rank 20). */
+  toNext: number | null;
+  /** Whether this week's points so far already keep the current rank at the reset. */
+  holding: boolean;
+  /** Progress (0–1) toward holding the rank, or once held, toward the next rank. */
+  progress: number;
+  weekKey: string;
+  history: EventWeek[];
+}
+
+export function rankStatus(state: AppState, now: Date): RankStatus | null {
+  const event = frontier(state);
+  if (!event) return null;
+  const target = targetPoints(fitnessTarget(state));
+  const max = rpMax(target);
+  const weekKey = weekKeyOf(dayKeyOf(now));
+  const points = weekPoints(entriesForWeek(state, weekKey));
+  // Rank shown is from the last reset; it rescales at once if the target changes.
+  const rank = rankOf(event.rp, max);
+  const projected = weekStep(event.rp, event.weakStreak, points).rp;
+  const lower = rpForRank(rank, max);
+  const upper = rpForRank(rank + 1, max);
+  return {
+    rank,
+    rp: event.rp,
+    rpMax: max,
+    target,
+    weekPoints: points,
+    projectedRank: rankOf(projected, max),
+    toHold: Math.max(0, pointsForRank(event.rp, event.weakStreak, rank, max) - points),
+    toNext: rank >= 20 ? null : Math.max(0, pointsForRank(event.rp, event.weakStreak, rank + 1, max) - points),
+    holding: projected >= lower - 1e-9,
+    progress:
+      projected < lower - 1e-9
+        ? Math.max(0, projected / lower)
+        : rank >= 20
+          ? 1
+          : Math.min(1, (projected - lower) / (upper - lower)),
+    weekKey,
+    history: eventHistory(state),
+  };
+}
+
+// ---------------------------------------------------------------- fitness log
+
+function fitnessEntry(input: Omit<FitnessEntry, 'id' | 'weekKey' | 'points'>): FitnessEntry {
+  return {
+    id: newId(),
+    ...input,
+    weekKey: weekKeyOf(input.dayKey),
+    points: FITNESS.points[input.type],
+  };
+}
+
+/** The fitness entry a tagged task logs when it's checked off. */
+export function taskFitnessEntry(day: DayRecord, task: DayTask, at: string): FitnessEntry | null {
+  if (!task.fitness) return null;
+  return fitnessEntry({ at, dayKey: day.id, type: task.fitness, source: 'task', taskId: task.id, note: task.name });
+}
+
+export function taskFitnessEntries(state: AppState, dayKey: string, taskId: string): FitnessEntry[] {
+  return [...state.fitness.values()].filter((e) => e.dayKey === dayKey && e.taskId === taskId);
+}
+
+/** Whether a new entry of this type would earn points this week (activities past the cap don't). */
+export function wouldCount(state: AppState, weekKey: string, type: FitnessType): boolean {
+  if (type !== 'activity') return true;
+  const activities = entriesForWeek(state, weekKey).filter((e) => e.type === 'activity').length;
+  return activities < FITNESS.activityWeeklyCap;
+}
+
+export function logActivity(
+  state: AppState,
+  input: { type: FitnessType; note: string },
+  now: Date,
+): ActionResult<{ points: number }> {
+  if (!(input.type in FITNESS.points)) throw new ActionError('Pick an activity type.');
+  const dayKey = dayKeyOf(now);
+  const entry = fitnessEntry({
+    at: now.toISOString(),
+    dayKey,
+    type: input.type,
+    source: 'manual',
+    note: input.note.trim() || FITNESS_LABELS[input.type],
+  });
+  const points = wouldCount(state, entry.weekKey, entry.type) ? entry.points : 0;
+  return done([put('fitness', entry)], { points });
+}
+
+export function undoActivity(state: AppState, entryId: string, now: Date): ActionResult {
+  const entry = state.fitness.get(entryId);
+  if (!entry) throw new ActionError('That entry no longer exists.');
+  if (entry.source !== 'manual') throw new ActionError('Undo the task on Today instead.');
+  if (entry.dayKey !== dayKeyOf(now)) throw new ActionError('Only today’s entries can be undone.');
+  return done([{ store: 'fitness', op: 'delete', id: entryId }], undefined);
+}

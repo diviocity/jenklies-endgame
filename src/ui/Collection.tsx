@@ -1,8 +1,9 @@
 import { activeAffirmations, affirmationCounts } from '../logic/actions';
 import { useStore } from '../store';
-import { Empty, PageTitle } from './common';
+import { Empty } from './common';
 
-export function Collection() {
+/** The 3★ affirmation collection, shown in the Bag. */
+export function AffirmationCollection() {
   const state = useStore();
   const list = activeAffirmations(state);
   const counts = affirmationCounts(state);
@@ -10,18 +11,16 @@ export function Collection() {
   const pct = list.length ? Math.round((collected / list.length) * 100) : 0;
 
   return (
-    <div class="page">
-      <PageTitle eyebrow="// archive · 3★ affirmations" title="Collection">
-        <div class="collected mono">
+    <>
+      <div class="row between">
+        <span class="hint">3★ affirmations · collected {collected} of {list.length}</span>
+        <span class="collected mono">
           <b>{collected}</b>/{list.length}
-        </div>
-      </PageTitle>
+        </span>
+      </div>
       <div class="meter" aria-label={`Collected ${collected} of ${list.length}`}>
         <i style={{ width: `${pct}%` }} />
       </div>
-      <p class="hint">
-        Collected {collected} of {list.length}
-      </p>
       {list.length === 0 ? (
         <Empty>No affirmations yet. Add some in More → Affirmations.</Empty>
       ) : (
@@ -48,6 +47,6 @@ export function Collection() {
           })}
         </ul>
       )}
-    </div>
+    </>
   );
 }

@@ -123,3 +123,18 @@ export function formatTime(iso: string): string {
 export function daysBetween(a: Date, b: Date): number {
   return Math.floor((b.getTime() - a.getTime()) / 86_400_000);
 }
+
+/** The day key `n` days after (or before) another. */
+export function addDays(key: string, n: number): string {
+  const d = keyToDate(key);
+  return dateToKey(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n));
+}
+
+/**
+ * The week a game day belongs to, as the day key of its Monday. Weeks run Monday 4:00 AM
+ * to Monday 4:00 AM, so they follow the same 4 AM rollover as days.
+ */
+export function weekKeyOf(dayKey: string): string {
+  const offset = (weekdayOf(dayKey) + 6) % 7; // Monday → 0 … Sunday → 6
+  return addDays(dayKey, -offset);
+}

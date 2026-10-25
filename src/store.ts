@@ -1,7 +1,9 @@
 import { useEffect, useReducer } from 'preact/hooks';
 import { commit, loadAll, replaceAll } from './db';
 import { ActionError, ensureDay, type ActionResult } from './logic/actions';
-import type { BackupFile } from './logic/backup';
+import { restoredData, type BackupFile } from './logic/backup';
+import { ensureEvent } from './logic/event';
+import { migrate } from './logic/migrate';
 import { applyChanges, emptyState, seedChanges } from './logic/state';
 import type { AppState } from './types';
 
@@ -42,9 +44,9 @@ async function save(changes: ActionResult<unknown>['changes']) {
   applyChanges(state, changes);
 }
 
-/** Starts a new day's snapshot if the clock has rolled past 4 AM. */
+/** Starts a new day's snapshot past 4 AM, and runs the weekly event reset when one is due. */
 export async function tick(now = new Date()): Promise<void> {
-  const changes = ensureDay(state, now);
+  const changes = [...ensureDay(state, now), ...ensureEvent(state, now)];
   if (changes.length) {
     await save(changes);
     notify();
@@ -56,6 +58,8 @@ export async function init(): Promise<void> {
   if (!state.meta.has('meta')) {
     const changes = seedChanges(new Date().toISOString());
     await save(changes);
+  } else {
+    await save(migrate(state, new Date()));
   }
   ready = true;
   await tick();
@@ -93,7 +97,7 @@ async function runNow<T>(action: (s: AppState, now: Date) => ActionResult<T>): P
 }
 
 export async function importBackup(file: BackupFile): Promise<void> {
-  await replaceAll(file.data);
+  await replaceAll(restoredData(file, new Date()));
   state = await loadAll();
   await tick();
   notify();

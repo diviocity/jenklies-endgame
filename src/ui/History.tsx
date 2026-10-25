@@ -1,11 +1,12 @@
 import { useState } from 'preact/hooks';
+import { countedEntryIds, FITNESS_LABELS } from '../logic/rank';
 import { sortByTime } from '../logic/state';
 import { formatDateTime } from '../logic/time';
 import { useStore } from '../store';
 import type { LedgerEntry, PullRecord } from '../types';
 import { Amount, BackLink, Empty, names, PageTitle, Segmented, Stars } from './common';
 
-type View = 'pulls' | 'ledger' | 'redemptions';
+type View = 'pulls' | 'ledger' | 'fitness' | 'redemptions';
 const PAGE = 100;
 
 export function History() {
@@ -20,11 +21,13 @@ export function History() {
         options={[
           { value: 'pulls', label: 'Pulls' },
           { value: 'ledger', label: 'Ledger' },
+          { value: 'fitness', label: 'Fitness' },
           { value: 'redemptions', label: 'Redeemed' },
         ]}
       />
       {view === 'pulls' && <Pulls />}
       {view === 'ledger' && <Ledger />}
+      {view === 'fitness' && <FitnessLog />}
       {view === 'redemptions' && <Redemptions />}
     </div>
   );
@@ -86,6 +89,43 @@ function Ledger() {
               <span class="clip">{e.note}</span>
               <span class={e.amount < 0 ? 'neg' : 'pos'}>
                 <Amount value={e.amount} currency={e.currency} signed />
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {entries.length > limit && (
+        <button class="btn ghost wide" onClick={more}>
+          Show more
+        </button>
+      )}
+    </>
+  );
+}
+
+function FitnessLog() {
+  const state = useStore();
+  const [limit, more] = useLimit();
+  const entries = sortByTime(state.fitness.values());
+  if (entries.length === 0) return <Empty>No fitness logged yet.</Empty>;
+  // Which entries counted is decided per week (only the first few activities do).
+  const counted = new Set<string>();
+  for (const week of new Set(entries.map((e) => e.weekKey))) {
+    for (const id of countedEntryIds(entries.filter((e) => e.weekKey === week))) counted.add(id);
+  }
+  return (
+    <>
+      <ul class="log">
+        {entries.slice(0, limit).map((e) => (
+          <li key={e.id} class="ledger-row">
+            <span class="mono muted">
+              {formatDateTime(e.at)} · {FITNESS_LABELS[e.type]}
+              {e.source === 'task' ? ' · task' : ''}
+            </span>
+            <span class="row between">
+              <span class="clip">{e.note}</span>
+              <span class={counted.has(e.id) ? 'pos mono' : 'muted mono'}>
+                {counted.has(e.id) ? `+${e.points} FP` : 'over cap'}
               </span>
             </span>
           </li>

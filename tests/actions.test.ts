@@ -91,14 +91,14 @@ describe('completing tasks', () => {
   it('earns base + bonus on time', () => {
     const state = setup();
     const result = run(state, completeTask(state, taskNamed(state, 'Shower').id, at(8, 30)));
-    expect(result).toEqual({ earned: 120, onTime: true, cleared: 0, perfect: 0 });
+    expect(result).toEqual({ earned: 120, onTime: true, cleared: 0, perfect: 0, fitness: 0 });
     expect(balances(state).sparks).toBe(120);
   });
 
   it('earns base only after the deadline', () => {
     const state = setup();
     const result = run(state, completeTask(state, taskNamed(state, 'Shower').id, at(9, 1)));
-    expect(result).toEqual({ earned: 100, onTime: false, cleared: 0, perfect: 0 });
+    expect(result).toEqual({ earned: 100, onTime: false, cleared: 0, perfect: 0, fitness: 0 });
   });
 
   it('uses the task deadline override', () => {
