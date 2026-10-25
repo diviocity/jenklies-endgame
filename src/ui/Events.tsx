@@ -1,11 +1,12 @@
 import { useState } from 'preact/hooks';
 import { FITNESS } from '../config';
-import { entriesForWeek, logActivity, rankStatus, undoActivity, type RankStatus } from '../logic/event';
+import { entriesForWeek, frontier, logActivity, rankStatus, undoActivity, type RankStatus } from '../logic/event';
 import { countedEntryIds, FITNESS_LABELS, FITNESS_TYPES } from '../logic/rank';
 import { addDays, dayKeyOf, deadlineAt, formatTime, keyToDate } from '../logic/time';
 import { play } from '../sound';
 import { run, useStore } from '../store';
 import type { FitnessType } from '../types';
+import { ExpeditionMap } from './ExpeditionMap';
 import { Empty, fmt, PageTitle, report, Segmented, Sheet, toast, useNow } from './common';
 
 export function Events({ sub }: { sub?: string }) {
@@ -62,19 +63,53 @@ function Frontier() {
         ‹ Events
       </a>
       <PageTitle eyebrow="// permanent event" title="Frontier Expedition" />
+      <Honors />
       <RankPanel status={status} now={now} />
       <button class="btn primary wide" onClick={() => setLogging(true)}>
         + Log activity
       </button>
+      <ExpeditionMap />
       <WeekLog weekKey={status.weekKey} now={now} />
-      <section class="panel map-soon">
-        <h3 class="section-label">Expedition map</h3>
-        <p class="hint">
-          The map arrives in the next update. Points you earn from now on already count toward it.
-        </p>
-      </section>
       {logging && <LogSheet onClose={() => setLogging(false)} weekKey={status.weekKey} />}
     </div>
+  );
+}
+
+/** Your title and, once finished, the expedition's completion record. */
+function Honors() {
+  const state = useStore();
+  const event = frontier(state);
+  if (!event) return null;
+  const record = event.completion;
+  return (
+    <>
+      {event.activeTitle && (
+        <p class="title-line mono">
+          <span class="muted">Title</span> {event.activeTitle}
+        </p>
+      )}
+      {record && (
+        <section class="panel record">
+          <h3 class="section-label">Expedition complete</h3>
+          <div class="rank-stats">
+            <div>
+              <span class="label">Finished</span>
+              <b class="mono">{new Date(record.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</b>
+            </div>
+            <div>
+              <span class="label">Peak rank</span>
+              <b class="mono">{record.peakRank}</b>
+            </div>
+            <div>
+              <span class="label">Sessions · weeks</span>
+              <b class="mono">
+                {record.sessions} · {record.weeks}
+              </b>
+            </div>
+          </div>
+        </section>
+      )}
+    </>
   );
 }
 

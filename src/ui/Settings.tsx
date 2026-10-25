@@ -7,6 +7,8 @@ import { BUCKET_LABELS, formatDateTime, inputToMinutes, minutesToInput, WEEKDAY_
 import { getState, importBackup, run, useStore } from '../store';
 import type { BucketId, FitnessTarget, Settings } from '../types';
 import { canIgnoreSilentMode } from '../sound';
+import { frontier } from '../logic/event';
+import { setActiveTitle } from '../logic/expedition';
 import { screenReport } from '../screen';
 import { FITNESS_LABELS, FITNESS_TYPES, targetPoints } from '../logic/rank';
 import { BackLink, BuildStamp, confirmDialog, fmt, PageTitle, report, toast } from './common';
@@ -17,6 +19,8 @@ export function SettingsPage() {
   const [s, setS] = useState<Settings>(saved);
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const dirty = JSON.stringify(s) !== JSON.stringify(saved);
+  const event = frontier(state);
+  const themes = event?.themes ?? [];
 
   useEffect(() => {
     void navigator.storage?.persisted?.().then(setPersisted, () => setPersisted(null));
@@ -92,10 +96,45 @@ export function SettingsPage() {
           target={s.fitnessTarget ?? { ...FITNESS.defaultTarget }}
           onChange={(fitnessTarget) => setS({ ...s, fitnessTarget })}
         />
+        {themes.includes('endgame') && (
+          <section class="panel">
+            <h3 class="section-label">Theme</h3>
+            <label class="switch">
+              <input
+                type="checkbox"
+                checked={s.theme === 'endgame'}
+                onChange={(e) => setS({ ...s, theme: e.currentTarget.checked ? 'endgame' : 'default' })}
+              />
+              <span>Endgame theme (unlocked by finishing the expedition)</span>
+            </label>
+          </section>
+        )}
         <button class="btn primary wide" type="submit" disabled={!dirty}>
           Save settings
         </button>
       </form>
+      {(event?.titles ?? []).length > 0 && (
+        <section class="panel">
+          <h3 class="section-label">Title</h3>
+          <label>
+            <span>Shown under the brand</span>
+            <select
+              value={event!.activeTitle ?? ''}
+              onChange={async (e) => {
+                const title = e.currentTarget.value || null;
+                report(await run((st) => setActiveTitle(st, title)));
+              }}
+            >
+              <option value="">No title</option>
+              {event!.titles!.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+      )}
       <section class="panel">
         <h3 class="section-label">Storage</h3>
         <p class="small">

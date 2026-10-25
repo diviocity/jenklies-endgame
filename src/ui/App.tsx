@@ -3,13 +3,17 @@ import { BACKUP } from '../config';
 import { balances } from '../logic/actions';
 import { getMeta } from '../logic/state';
 import { daysBetween } from '../logic/time';
-import { isReady, useStore } from '../store';
+import { frontier } from '../logic/event';
+import { describeReward, REGIONS } from '../logic/expedition';
+import { play } from '../sound';
+import { isReady, onExpeditionClaims, useStore } from '../store';
 import { Bag } from './Bag';
-import { Amount, UiHost } from './common';
+import { Amount, toast, UiHost } from './common';
 import { Events } from './Events';
 import { More } from './More';
 import { Pull } from './Pull';
 import { Today } from './Today';
+import { WeeklyReport } from './WeeklyReport';
 
 type Tab = 'today' | 'pull' | 'bag' | 'events' | 'more';
 
@@ -85,9 +89,33 @@ function backupDue(lastBackupAt: string | null): boolean {
   return !lastBackupAt || daysBetween(new Date(lastBackupAt), new Date()) >= BACKUP.remindAfterDays;
 }
 
+/** Announces expedition nodes as they're reached. */
+function useExpeditionToasts() {
+  useEffect(
+    () =>
+      onExpeditionClaims((nodes) => {
+        play('clear');
+        const big = nodes.filter((n) => n.selector);
+        for (const n of big) toast(`${REGIONS[n.region].name} cleared! ${describeReward(n)}`, 'good');
+        const rest = nodes.filter((n) => !n.selector);
+        if (rest.length === 1) toast(`Expedition node reached: ${describeReward(rest[0])}`, 'good');
+        else if (rest.length > 1) {
+          const sparks = rest.reduce((sum, n) => sum + n.sparks, 0);
+          toast(`${rest.length} expedition nodes reached: +${sparks.toLocaleString('en-US')} Sparks`, 'good');
+        }
+      }),
+    [],
+  );
+}
+
 export function App() {
   const state = useStore();
   const route = useRoute();
+  useExpeditionToasts();
+  const theme = state.meta.get('meta')?.settings.theme ?? 'default';
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
   if (!isReady()) return <div class="boot">INITIALIZING…</div>;
 
   // The Collection tab moved into the Bag; old links land there.
@@ -96,14 +124,18 @@ export function App() {
   const { sparks, shards } = balances(state);
   const meta = getMeta(state);
   const due = backupDue(meta.lastBackupAt);
+  const title = frontier(state)?.activeTitle;
 
   return (
     <div class="app">
       <header class="topbar">
         <div class="brand">
           <span class="brand-mark" aria-hidden="true" />
-          <span>
-            JENKLIES<b>//ENDGAME</b>
+          <span class="brand-text">
+            <span>
+              JENKLIES<b>//ENDGAME</b>
+            </span>
+            {title && <small class="brand-title">{title}</small>}
           </span>
         </div>
         <div class="wallet">
@@ -132,6 +164,7 @@ export function App() {
           </a>
         ))}
       </nav>
+      <WeeklyReport />
       <UiHost />
     </div>
   );

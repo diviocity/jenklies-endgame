@@ -50,12 +50,13 @@ export function balances(state: AppState): { sparks: number; shards: number } {
   return { sparks, shards };
 }
 
-/** How many of each indulgence I hold: won + bought − redeemed. */
+/** How many of each indulgence I hold: won + bought + chosen with selectors − redeemed. */
 export function inventory(state: AppState): Map<string, number> {
   const counts = new Map<string, number>();
   const add = (id: string, n: number) => counts.set(id, (counts.get(id) ?? 0) + n);
   for (const p of state.pulls.values()) if (p.kind === 'indulgence') add(p.itemId, 1);
   for (const p of state.purchases.values()) add(p.indulgenceId, 1);
+  for (const sel of state.selectors.values()) if (sel.indulgenceId) add(sel.indulgenceId, 1);
   for (const r of state.redemptions.values()) add(r.indulgenceId, -1);
   return counts;
 }

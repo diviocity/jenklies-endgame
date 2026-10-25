@@ -4,10 +4,11 @@ import { activeIndulgences, balances, buy, inventory, redeem } from '../logic/ac
 import { sortByOrder } from '../logic/state';
 import { play } from '../sound';
 import { run, useStore } from '../store';
-import type { Indulgence } from '../types';
+import { useSelector } from '../logic/expedition';
+import type { Indulgence, Selector } from '../types';
 import { AffirmationCollection } from './Collection';
 import { Redemptions } from './History';
-import { Amount, confirmDialog, Empty, names, PageTitle, report, Segmented, Stars, toast } from './common';
+import { Amount, confirmDialog, Empty, names, PageTitle, report, Segmented, Sheet, Stars, toast } from './common';
 
 export type BagView = View;
 type View = 'inventory' | 'affirmations' | 'shop' | 'log';
@@ -66,8 +67,13 @@ function Inventory() {
     if (report(await run((s, now) => redeem(s, item.id, now))) !== undefined) toast(`Redeemed: ${item.name}`, 'good');
   };
 
-  if (held.length === 0) return <Empty>Nothing in storage yet. Win indulgences from pulls or buy them in the shop.</Empty>;
+  const selectors = [...state.selectors.values()].filter((sel) => !sel.usedAt);
+  if (held.length === 0 && selectors.length === 0) {
+    return <Empty>Nothing in storage yet. Win indulgences from pulls or buy them in the shop.</Empty>;
+  }
   return (
+    <>
+      {selectors.length > 0 && <Selectors selectors={selectors} />}
     <ul class="items">
       {held.map((item) => (
         <li key={item.id} class={`item panel r${item.rarity}`}>
@@ -82,6 +88,73 @@ function Inventory() {
         </li>
       ))}
     </ul>
+    </>
+  );
+}
+
+/** Unopened selectors from the expedition: each one turns into an indulgence of your choice. */
+function Selectors({ selectors }: { selectors: Selector[] }) {
+  const [open, setOpen] = useState<Selector | null>(null);
+  return (
+    <>
+      <ul class="items">
+        {selectors.map((sel) => (
+          <li key={sel.id} class={`item panel selector r${sel.rarity}`}>
+            <div class="item-head">
+              <span class={`item-emoji r${sel.rarity}`}>✦</span>
+              <span>
+                <span class="item-name">{sel.rarity}★ Selector</span>
+                <small class="muted">{sel.source} · choose any active {sel.rarity}★ indulgence</small>
+              </span>
+            </div>
+            <button class="btn primary" onClick={() => setOpen(sel)}>
+              Choose
+            </button>
+          </li>
+        ))}
+      </ul>
+      {open && <SelectorSheet selector={open} onClose={() => setOpen(null)} />}
+    </>
+  );
+}
+
+function SelectorSheet({ selector, onClose }: { selector: Selector; onClose: () => void }) {
+  const state = useStore();
+  const options = activeIndulgences(state, selector.rarity);
+  const choose = async (item: Indulgence) => {
+    const ok = await confirmDialog({
+      title: `Take ${item.name}?`,
+      body: `This uses your ${selector.rarity}★ selector. It goes into your Bag to redeem whenever you like.`,
+      confirmLabel: 'Take it',
+    });
+    if (!ok) return;
+    play('buy');
+    const result = report(await run((s, now) => useSelector(s, selector.id, item.id, now)));
+    if (result) {
+      toast(`Added to your Bag: ${result.name}`, 'good');
+      onClose();
+    }
+  };
+  return (
+    <Sheet title={`${selector.rarity}★ Selector`} onClose={onClose}>
+      {options.length === 0 ? (
+        <Empty>No active {selector.rarity}★ indulgences. Add or bring one back in More → Indulgences.</Empty>
+      ) : (
+        <ul class="items">
+          {options.map((item) => (
+            <li key={item.id}>
+              <button class={`panel item-row r${item.rarity}`} onClick={() => choose(item)}>
+                <span class={`item-emoji r${item.rarity}`}>{item.emoji || '◆'}</span>
+                <span class="grow">
+                  <span class="item-name">{item.name}</span>
+                  {item.note && <small class="muted">{item.note}</small>}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Sheet>
   );
 }
 

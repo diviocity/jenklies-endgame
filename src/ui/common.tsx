@@ -65,10 +65,11 @@ export function UiHost() {
     dialog = null;
     notifyUi();
   };
+  // Above everything, including sheets, so a confirmation opened from a sheet is on top.
   return (
-    <>
+    <Portal>
       {dialog && (
-        <div class="overlay" onClick={() => close(false)}>
+        <div class="overlay dialog-overlay" onClick={() => close(false)}>
           <div class="dialog panel" role="alertdialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div class="eyebrow">// confirm</div>
             <h2>{dialog.title}</h2>
@@ -91,7 +92,7 @@ export function UiHost() {
           </div>
         ))}
       </div>
-    </>
+    </Portal>
   );
 }
 

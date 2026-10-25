@@ -1481,6 +1481,270 @@ span.r5 {
   color: var(--r3);
 }
 
+/* ---------------------------------------------------------------- expedition map */
+
+.expedition {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.map-next {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.map-next b {
+  color: var(--text);
+}
+
+.map-next.gated {
+  padding: 8px 10px;
+  border-left: 2px solid var(--late);
+  background: rgba(232, 165, 75, 0.08);
+}
+
+.map-next.gated b {
+  color: var(--late);
+}
+
+.map-next.done {
+  color: var(--ok);
+}
+
+.regions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.region {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0 10px;
+  border-top: 1px solid var(--line);
+}
+
+.region-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.region-head b {
+  flex: 1;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.region-no {
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.region.locked .region-head b,
+.region.ahead .region-head b {
+  color: var(--muted);
+}
+
+.region-chip {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+}
+
+.region-chip.cleared {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.region-chip.active {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.region-chip.locked {
+  color: var(--late);
+  border-color: var(--late);
+  border-style: dashed;
+}
+
+/* The route through a region: a line with its nodes placed by distance. */
+.region-track {
+  position: relative;
+  height: 22px;
+  margin: 0 9px;
+  background: linear-gradient(var(--line-2), var(--line-2)) center / 100% 2px no-repeat;
+}
+
+.region.locked .region-track {
+  background: repeating-linear-gradient(90deg, var(--line-2) 0 6px, transparent 6px 10px) center / 100% 2px no-repeat;
+}
+
+.region-fill {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  height: 2px;
+  background: var(--accent);
+}
+
+.map-node {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--line-2);
+  background: var(--panel);
+  transform: rotate(45deg);
+  font-size: 0;
+}
+
+.map-node.reached {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.map-node.cache {
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-color: #7fe0ff;
+}
+
+.map-node.cache.reached {
+  background: #7fe0ff;
+}
+
+.map-node.regionEnd,
+.map-node.final {
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-color: var(--r5);
+  border-width: 2px;
+}
+
+.map-node.regionEnd.reached,
+.map-node.final.reached {
+  background: var(--r5);
+}
+
+.map-node.next {
+  border-color: var(--text);
+  box-shadow: 0 0 0 3px rgba(244, 209, 58, 0.25);
+  animation: node-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes node-pulse {
+  50% {
+    box-shadow: 0 0 0 6px rgba(244, 209, 58, 0.08);
+  }
+}
+
+.title-line {
+  margin: -6px 0 0;
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.title-line .muted {
+  margin-right: 6px;
+}
+
+.record {
+  border-color: var(--r5);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.brand-title {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.item.selector {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.item.selector small {
+  display: block;
+  font-size: 12px;
+}
+
+.weekly-report {
+  max-height: calc(var(--app-h) - var(--safe-top) - var(--safe-bottom) - 32px);
+  overflow-y: auto;
+}
+
+.report-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 6px;
+}
+
+.report-body .rank-stats {
+  grid-template-columns: 1fr 1fr;
+}
+
+.report-body .rank-stats small {
+  font-size: 11px;
+}
+
+.report-line {
+  margin: 0;
+  font-size: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.report-nodes {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  color: var(--r5);
+}
+
+/* The Endgame theme, unlocked by finishing the expedition (phase 3 will polish it). */
+:root[data-theme='endgame'] {
+  --bg: #090b10;
+  --bg-2: #0e1118;
+  --panel: #121722;
+  --panel-2: #18202e;
+  --line: #243046;
+  --line-2: #34435e;
+  --accent: #ffc93a;
+  --accent-2: #ffe08a;
+}
+
 /* ---------------------------------------------------------------- more */
 
 .menu {
@@ -1727,6 +1991,10 @@ textarea {
   padding: 16px 16px calc(var(--safe-bottom) + 20px);
 }
 
+.dialog-overlay {
+  z-index: 70;
+}
+
 .dialog {
   width: 100%;
   max-width: 420px;
@@ -1758,7 +2026,7 @@ textarea {
   right: 0;
   height: var(--app-h);
   padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 12px);
-  z-index: 60;
+  z-index: 80;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
