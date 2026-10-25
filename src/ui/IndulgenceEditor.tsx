@@ -4,7 +4,7 @@ import { deleteIndulgence, indulgenceUsed, saveIndulgence, type IndulgenceInput 
 import { sortByOrder } from '../logic/state';
 import { run, useStore } from '../store';
 import type { Indulgence } from '../types';
-import { BackLink, confirmDialog, Empty, names, PageTitle, report, Segmented, Sheet, Stars } from './common';
+import { BackLink, confirmDialog, Empty, names, PageTitle, Segmented, Sheet, Stars, succeeded, useSaving } from './common';
 
 export function IndulgenceEditor() {
   const state = useStore();
@@ -58,13 +58,13 @@ function IndulgenceSheet(props: { draft: IndulgenceInput; onClose: () => void })
   const set = (patch: Partial<IndulgenceInput>) => setD((prev) => ({ ...prev, ...patch }));
   const used = d.id ? indulgenceUsed(state, d.id) : false;
 
-  const save = async (e: Event) => {
+  const [saving, save] = useSaving(async (e: Event) => {
     e.preventDefault();
-    if (report(await run((s, now) => saveIndulgence(s, d, now))) !== undefined) props.onClose();
-  };
+    if (succeeded(await run((s, now) => saveIndulgence(s, d, now)))) props.onClose();
+  });
   const remove = async () => {
     const ok = await confirmDialog({ title: `Delete "${d.name}"?`, confirmLabel: 'Delete', danger: true });
-    if (ok && report(await run((s) => deleteIndulgence(s, d.id!))) !== undefined) props.onClose();
+    if (ok && succeeded(await run((s) => deleteIndulgence(s, d.id!)))) props.onClose();
   };
 
   return (
@@ -105,8 +105,8 @@ function IndulgenceSheet(props: { draft: IndulgenceInput; onClose: () => void })
           <input type="checkbox" checked={d.active} onChange={(e) => set({ active: e.currentTarget.checked })} />
           <span>Active (in pulls and the shop)</span>
         </label>
-        <button class="btn primary wide" type="submit">
-          Save
+        <button class="btn primary wide" type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
         </button>
         {d.id && !used && (
           <button type="button" class="btn danger-ghost wide" onClick={remove}>

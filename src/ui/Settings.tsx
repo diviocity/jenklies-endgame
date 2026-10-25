@@ -11,7 +11,7 @@ import { frontier } from '../logic/event';
 import { setActiveTitle } from '../logic/expedition';
 import { screenReport } from '../screen';
 import { FITNESS_LABELS, FITNESS_TYPES, targetPoints } from '../logic/rank';
-import { BackLink, BuildStamp, confirmDialog, fmt, PageTitle, report, toast } from './common';
+import { BackLink, BuildStamp, confirmDialog, fmt, PageTitle, report, succeeded, toast } from './common';
 
 export function SettingsPage() {
   const state = useStore();
@@ -33,7 +33,7 @@ export function SettingsPage() {
 
   const save = async (e: Event) => {
     e.preventDefault();
-    if (report(await run((st) => saveSettings(st, s))) !== undefined) toast('Settings saved', 'good');
+    if (succeeded(await run((st) => saveSettings(st, s)))) toast('Settings saved', 'good');
   };
 
   const requestPersist = async () => {

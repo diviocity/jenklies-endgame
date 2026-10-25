@@ -14,7 +14,7 @@ import { run, useStore } from '../store';
 import { FITNESS } from '../config';
 import { FITNESS_LABELS, FITNESS_TYPES } from '../logic/rank';
 import type { BucketId, DayType, FitnessType, TemplateTask } from '../types';
-import { BackLink, confirmDialog, Empty, fmt, PageTitle, report, Segmented, Sheet } from './common';
+import { BackLink, confirmDialog, Empty, fmt, PageTitle, report, Segmented, Sheet, succeeded, useSaving } from './common';
 
 const GROUP_DAYS: Record<DayType, number[]> = { weekday: [1, 2, 3, 4, 5], weekend: [6, 0] };
 
@@ -150,7 +150,7 @@ function TaskSheet(props: { draft: Draft; group: DayType; onClose: () => void })
   const toggleDay = (day: number) =>
     set({ days: d.days.includes(day) ? d.days.filter((x) => x !== day) : [...d.days, day] });
 
-  const save = async (e: Event) => {
+  const [saving, save] = useSaving(async (e: Event) => {
     e.preventDefault();
     const input = {
       id: d.id,
@@ -163,8 +163,8 @@ function TaskSheet(props: { draft: Draft; group: DayType; onClose: () => void })
     };
     const problem = validateTemplateTask(input);
     if (problem) return setError(problem);
-    if (report(await run((s) => saveTemplateTask(s, input))) !== undefined) props.onClose();
-  };
+    if (succeeded(await run((s) => saveTemplateTask(s, input)))) props.onClose();
+  });
 
   const remove = async () => {
     const ok = await confirmDialog({
@@ -173,7 +173,7 @@ function TaskSheet(props: { draft: Draft; group: DayType; onClose: () => void })
       confirmLabel: 'Delete',
       danger: true,
     });
-    if (ok && report(await run((s) => deleteTemplateTask(s, d.id!))) !== undefined) props.onClose();
+    if (ok && succeeded(await run((s) => deleteTemplateTask(s, d.id!)))) props.onClose();
   };
 
   return (
@@ -243,8 +243,8 @@ function TaskSheet(props: { draft: Draft; group: DayType; onClose: () => void })
           </select>
         </label>
         {error && <p class="blocked">{error}</p>}
-        <button class="btn primary wide" type="submit">
-          Save
+        <button class="btn primary wide" type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
         </button>
         {d.id && (
           <button type="button" class="btn danger-ghost wide" onClick={remove}>

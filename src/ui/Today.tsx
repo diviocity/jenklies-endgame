@@ -14,7 +14,7 @@ import { FITNESS } from '../config';
 import { play } from '../sound';
 import { run, useStore } from '../store';
 import type { BucketId, DayBucket, DayRecord, DayTask } from '../types';
-import { Amount, confirmDialog, Empty, fmt, names, report, Sheet, toast, useNow } from './common';
+import { Amount, confirmDialog, Empty, fmt, names, report, Sheet, succeeded, toast, useNow, useSaving } from './common';
 
 function timeLeft(ms: number): string {
   const mins = Math.max(0, Math.round(ms / 60_000));
@@ -216,12 +216,11 @@ function OneOffSheet({ day, onClose }: { day: DayRecord; onClose: () => void }) 
   const [deadline, setDeadline] = useState('');
   const value = oneOffValues(day);
 
-  const save = async (e: Event) => {
+  const [saving, save] = useSaving(async (e: Event) => {
     e.preventDefault();
     const minutes = deadline ? inputToMinutes(deadline) : null;
-    const ok = report(await run((s, now) => addOneOff(s, { name, bucket, deadline: minutes }, now)));
-    if (ok !== undefined) onClose();
-  };
+    if (succeeded(await run((s, now) => addOneOff(s, { name, bucket, deadline: minutes }, now)))) onClose();
+  });
 
   return (
     <Sheet title="One-off task" onClose={onClose}>
@@ -247,8 +246,8 @@ function OneOffSheet({ day, onClose }: { day: DayRecord; onClose: () => void }) 
         <p class="hint">
           Worth +{value.base} (+{value.bonus} on time), today only. One-off tasks don't affect bucket bonuses.
         </p>
-        <button class="btn primary wide" type="submit">
-          Add to today
+        <button class="btn primary wide" type="submit" disabled={saving}>
+          {saving ? 'Adding…' : 'Add to today'}
         </button>
       </form>
     </Sheet>
