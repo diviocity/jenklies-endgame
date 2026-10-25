@@ -1,4 +1,4 @@
-import { FITNESS } from '../config';
+import { FITNESS, WEEKLY_REWARDS } from '../config';
 import type {
   AppState,
   Change,
@@ -9,6 +9,7 @@ import type {
   FitnessTarget,
   FitnessType,
   FrontierState,
+  LedgerEntry,
 } from '../types';
 import { ActionError, done, type ActionResult } from './errors';
 import { newId } from './ids';
@@ -88,7 +89,8 @@ export function ensureEvent(state: AppState, now: Date): Change[] {
       closedAt: now.toISOString(),
       seen: false,
     };
-    changes.push(put('eventWeeks', record));
+    record.mapAtClose = event.mapProgress ?? 0;
+    changes.push(...payWeek(record, now));
     event.rp = step.rp;
     event.weakStreak = step.weakStreak;
     event.rank = rankAfter;
@@ -96,6 +98,33 @@ export function ensureEvent(state: AppState, now: Date): Change[] {
     event.currentWeek = addDays(event.currentWeek, 7);
   }
   changes.push(put('events', event));
+  return changes;
+}
+
+// ---------------------------------------------------------------- weekly rewards
+
+/** The weekly reward for a week's points against the target, and for holding Rank 20. */
+export function weeklyReward(points: number, target: number, rankAfter: number): { sparks: number; shards: number } {
+  const { full, half } = WEEKLY_REWARDS;
+  const tier = target <= 0 ? null : points >= target * full.share ? full : points >= target * half.share ? half : null;
+  return {
+    sparks: tier?.sparks ?? 0,
+    shards: (tier?.shards ?? 0) + (rankAfter >= 20 ? WEEKLY_REWARDS.rank20Shards : 0),
+  };
+}
+
+function ledger(entry: Omit<LedgerEntry, 'id'>): Change {
+  return put('ledger', { id: newId(), ...entry });
+}
+
+/** Pays a closed week's reward into the ledger and records it on the week. */
+export function payWeek(week: EventWeek, now: Date): Change[] {
+  const { sparks, shards } = weeklyReward(week.points, week.targetPoints, week.rankAfter);
+  const at = now.toISOString();
+  const note = `Expedition: week of ${week.id}`;
+  const changes: Change[] = [put('eventWeeks', { ...week, rewardSparks: sparks, rewardShards: shards })];
+  if (sparks) changes.push(ledger({ at, currency: 'sparks', amount: sparks, reason: 'event_weekly', note }));
+  if (shards) changes.push(ledger({ at, currency: 'shards', amount: shards, reason: 'event_weekly', note }));
   return changes;
 }
 

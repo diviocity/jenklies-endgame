@@ -1,6 +1,6 @@
 import { FITNESS, SCHEMA_VERSION } from '../config';
 import type { AppState, Change } from '../types';
-import { taskFitnessEntry } from './event';
+import { payWeek, taskFitnessEntry } from './event';
 import { fitnessTagFor } from './seed';
 import { getMeta, put } from './state';
 import { dayKeyOf } from './time';
@@ -15,6 +15,7 @@ export function migrate(state: AppState, now: Date): Change[] {
   const changes: Change[] = [];
 
   if (meta.schemaVersion < 2) changes.push(...toVersion2(state, now));
+  if (meta.schemaVersion < 3) changes.push(...toVersion3(state, now));
 
   changes.push(
     put('meta', {
@@ -61,4 +62,12 @@ function toVersion2(state: AppState, now: Date): Change[] {
     }
   }
   return changes;
+}
+
+/**
+ * Version 3 adds the expedition map and weekly rewards. Weeks closed before then get their
+ * weekly reward now; the map catches up on its own the next time it settles.
+ */
+function toVersion3(state: AppState, now: Date): Change[] {
+  return [...state.eventWeeks.values()].filter((w) => w.rewardSparks === undefined).flatMap((w) => payWeek(w, now));
 }

@@ -75,4 +75,33 @@ export const RANK = {
   rpMaxFactor: 0.9,
 } as const;
 
-export const SCHEMA_VERSION = 2;
+export const EXPEDITION = {
+  /** The route, in order. Moving forward inside a region needs at least its minimum rank. */
+  regions: [
+    { name: 'Outskirts', minRank: 1, length: 1_500, title: 'Outskirts Scout' },
+    { name: 'Badlands', minRank: 5, length: 1_600, title: 'Badlands Ranger' },
+    { name: 'Deep Frontier', minRank: 10, length: 2_600, title: 'Frontier Pathfinder' },
+    { name: 'The Wall', minRank: 15, length: 4_200, title: 'Wallbreaker' },
+    { name: 'Endgame', minRank: 20, length: 3_600, title: null },
+  ],
+  /** Nodes are spaced evenly inside each region, about this far apart. */
+  nodeSpacing: 260,
+  /** Every Nth node along the whole route is a Cache. */
+  cacheEvery: 4,
+  nodeReward: { sparks: 250, shards: 0 },
+  cacheReward: { sparks: 1_000, shards: 5 },
+  /** Region-end selectors (they replace the node's Sparks): regions 1–2 give 4★, 3–5 give 5★. */
+  regionEndSelector: [4, 4, 5, 5, 5] as (4 | 5)[],
+  /** Unlocked by finishing the Endgame. */
+  finalTheme: 'endgame',
+} as const;
+
+export const WEEKLY_REWARDS = {
+  /** Paid at the reset for the week that ended; the higher tier replaces the lower one. */
+  half: { share: 0.5, sparks: 500, shards: 2 },
+  full: { share: 1, sparks: 1_500, shards: 5 },
+  /** Extra Shards for holding Rank 20 at the reset. */
+  rank20Shards: 5,
+} as const;
+
+export const SCHEMA_VERSION = 3;

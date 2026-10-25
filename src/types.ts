@@ -20,6 +20,8 @@ export interface Settings {
   shardsName: string;
   /** The Frontier Expedition's target week (missing in data from before the event). */
   fitnessTarget?: FitnessTarget;
+  /** UI theme; 'endgame' is unlocked by finishing the expedition. */
+  theme?: 'default' | 'endgame';
 }
 
 export interface Meta {
@@ -95,7 +97,9 @@ export type LedgerReason =
   | 'undo'
   | 'pull'
   | 'pull_shards'
-  | 'shop';
+  | 'shop'
+  | 'event_node'
+  | 'event_weekly';
 
 export interface LedgerEntry {
   id: string;
@@ -194,6 +198,25 @@ export interface FrontierState {
   /** Consecutive weak weeks so far (drives the decay rate). */
   weakStreak: number;
   peakRank: number;
+  /** How far along the map you are, in points. It only ever moves forward; nodes up to here are claimed. */
+  mapProgress?: number;
+  /** Titles earned by clearing regions. */
+  titles?: string[];
+  /** The title shown under the brand (null for none). */
+  activeTitle?: string | null;
+  /** UI themes unlocked. */
+  themes?: string[];
+  /** Set when the Endgame is finished. */
+  completion?: ExpeditionRecord | null;
+}
+
+export interface ExpeditionRecord {
+  at: string;
+  peakRank: number;
+  /** Fitness sessions that counted, from the start to the finish. */
+  sessions: number;
+  /** Weeks from the event's first week to the finish (inclusive). */
+  weeks: number;
 }
 
 /** A closed week of the Frontier Expedition: its points and what the reset did. */
@@ -213,6 +236,11 @@ export interface EventWeek {
   closedAt: string;
   /** Whether the weekly report for this week has been shown. */
   seen: boolean;
+  /** Weekly rewards paid at the reset (missing on weeks closed before weekly rewards existed). */
+  rewardSparks?: number;
+  rewardShards?: number;
+  /** Map position when the week closed. */
+  mapAtClose?: number;
 }
 
 /** An unopened (or used) indulgence selector from the expedition map. */
