@@ -13,12 +13,14 @@ Every number lives in `src/config.ts` (`FITNESS`, `RANK`, `EXPEDITION`, `WEEKLY_
 
 | Type | Points | Notes |
 |---|---|---|
-| CrossFit | 100 | |
-| Shoulder PT | 50 | |
-| Other workout | 75 | logged by hand |
-| Activity (dog walk, extra walk, …) | 10 | only the first 7 per week count |
+| Major activity (e.g. CrossFit) | 100 | |
+| Other workout | 75 | |
+| Moderate activity (e.g. shoulder PT) | 50 | |
+| Minor activity (e.g. dog walk, extra walk) | 10 | only the first 7 per week count |
 
-- **Tagged tasks:** template tasks can have a fitness type (set in the template editor). Checking one off logs its points automatically, and undoing the task removes them. The starting template tags CrossFit, Shoulder PT and Dog walk.
+The types are named by effort rather than by a specific workout, so the routine can change without renaming anything. In the saved data they keep their original codes (`crossfit`, `workout`, `pt`, `activity`), so renaming them needed no data upgrade.
+
+- **Tagged tasks:** template tasks can have a fitness type (set in the template editor). Checking one off logs its points automatically, and undoing the task removes them. The starting template tags CrossFit as Major, Shoulder PT as Moderate and Dog walk as Minor.
 - **Manual logs:** "Log activity" on the event screen records anything outside the schedule. Manual entries can be undone the same day.
 - **Where they're recorded:** fitness points have their own log (History → Fitness), not the currency ledger.
 
@@ -29,7 +31,7 @@ The week runs Monday 4:00 AM to Monday 4:00 AM. At each reset:
 - `RP = RP × (1 − decay) + this week's points`
 - `Rank = floor(20 × RP / RP_max)`, between 1 and 20
 - `RP_max = 0.9 × (target week points ÷ 0.10)`
-- **Target week:** set in Settings. The default is 3 CrossFit + 3 PT + 7 activities = 520 points, so RP_max is 4,680. Changing the target rescales your rank immediately, so Rank 20 always means "doing my full routine consistently".
+- **Target week:** set in Settings. The default is 3 Major + 3 Moderate + 7 Minor = 520 points, so RP_max is 4,680. Changing the target rescales your rank immediately, so Rank 20 always means "doing my full routine consistently".
 - **Decay:** 10% normally. A week is **weak** if its points are below RP × 10%. Consecutive weak weeks decay 10%, then 15%, then 25% from the third week on. One non-weak week resets decay to normal. There are no rank floors.
 - **Missed weeks:** weeks you don't open the app are processed when you next open it, as zero-point weeks.
 

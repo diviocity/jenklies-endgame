@@ -1,14 +1,16 @@
 import { FITNESS, RANK } from '../config';
 import type { FitnessEntry, FitnessTarget, FitnessType } from '../types';
 
+/** Display names. The stored codes (crossfit, pt, …) predate the names and stay as they are. */
 export const FITNESS_LABELS: Record<FitnessType, string> = {
-  crossfit: 'CrossFit',
-  pt: 'Shoulder PT',
+  crossfit: 'Major activity',
   workout: 'Other workout',
-  activity: 'Activity',
+  pt: 'Moderate activity',
+  activity: 'Minor activity',
 };
 
-export const FITNESS_TYPES: FitnessType[] = ['crossfit', 'pt', 'workout', 'activity'];
+/** In points order: 100, 75, 50, 10. */
+export const FITNESS_TYPES: FitnessType[] = ['crossfit', 'workout', 'pt', 'activity'];
 
 /** Points for a full target week. */
 export function targetPoints(target: FitnessTarget): number {

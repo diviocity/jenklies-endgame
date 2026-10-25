@@ -279,7 +279,7 @@ function TargetWeek(props: { target: FitnessTarget; onChange: (t: FitnessTarget)
       </div>
       <p class="hint">
         {fmt(total)} points a week. Rank 20 means doing this consistently, and your rank rescales straight away when you
-        change it (for example, when PT ends). Only {FITNESS.activityWeeklyCap} activities a week count.
+        change it (for example, when PT ends). Only {FITNESS.activityWeeklyCap} minor activities a week count.
       </p>
     </section>
   );

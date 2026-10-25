@@ -55,11 +55,11 @@ export const BACKUP = {
 } as const;
 
 export const FITNESS = {
-  /** Points per activity. */
+  /** Points per type: Major 100, Other workout 75, Moderate 50, Minor 10 (keys are the stored codes). */
   points: { crossfit: 100, pt: 50, workout: 75, activity: 10 },
-  /** Only this many 'activity' entries per week earn points. */
+  /** Only this many Minor activities per week earn points. */
   activityWeeklyCap: 7,
-  /** Default target week: 3 CrossFit + 3 PT + 7 activities = 520 points. Editable in Settings. */
+  /** Default target week: 3 Major + 3 Moderate + 7 Minor = 520 points. Editable in Settings. */
   defaultTarget: { crossfit: 3, pt: 3, workout: 0, activity: 7 },
 } as const;
 

@@ -249,7 +249,7 @@ function WeekLog({ weekKey, now }: { weekKey: string; now: Date }) {
   );
 }
 
-const TYPE_SHORT: Record<FitnessType, string> = { crossfit: 'CrossFit', pt: 'PT', workout: 'Workout', activity: 'Activity' };
+const TYPE_SHORT: Record<FitnessType, string> = { crossfit: 'Major', workout: 'Workout', pt: 'Moderate', activity: 'Minor' };
 
 function LogSheet({ onClose, weekKey }: { onClose: () => void; weekKey: string }) {
   const state = useStore();
@@ -262,7 +262,7 @@ function LogSheet({ onClose, weekKey }: { onClose: () => void; weekKey: string }
     play('complete');
     const result = report(await run((s, now) => logActivity(s, { type, note }, now)));
     if (result === undefined) return;
-    toast(result.points > 0 ? `+${result.points} fitness points` : 'Logged · over this week’s activity cap', 'good');
+    toast(result.points > 0 ? `+${result.points} fitness points` : 'Logged · over this week’s minor activity cap', 'good');
     onClose();
   };
 
@@ -280,14 +280,14 @@ function LogSheet({ onClose, weekKey }: { onClose: () => void; weekKey: string }
         <p class="hint">
           {FITNESS_LABELS[type]}: +{FITNESS.points[type]} points.
           {type === 'activity' &&
-            ` Only the first ${FITNESS.activityWeeklyCap} activities a week count (${Math.min(activities, FITNESS.activityWeeklyCap)} so far).`}
+            ` Only the first ${FITNESS.activityWeeklyCap} minor activities a week count (${Math.min(activities, FITNESS.activityWeeklyCap)} so far).`}
         </p>
         <label>
           <span>Note (optional)</span>
           <input
             value={note}
             maxLength={80}
-            placeholder={type === 'activity' ? 'e.g. Evening walk' : 'e.g. Hike, swim, bike ride'}
+            placeholder={type === 'activity' ? 'e.g. Evening walk' : type === 'crossfit' ? 'e.g. CrossFit class' : type === 'pt' ? 'e.g. Shoulder PT' : 'e.g. Hike, swim, bike ride'}
             onInput={(e) => setNote(e.currentTarget.value)}
           />
         </label>
