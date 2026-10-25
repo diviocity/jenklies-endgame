@@ -6,6 +6,10 @@ export type Currency = 'sparks' | 'shards';
 /** Minutes after midnight of the day's date. Values past 1440 mean after midnight (up to 4 AM). */
 export type Minutes = number;
 
+/**
+ * Fitness activity types, stored by code. Shown as Major activity (crossfit), Other workout
+ * (workout), Moderate activity (pt) and Minor activity (activity); see FITNESS_LABELS.
+ */
 export type FitnessType = 'crossfit' | 'pt' | 'workout' | 'activity';
 
 /** How many of each fitness activity make up a full target week. */

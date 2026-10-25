@@ -5,7 +5,7 @@ A permanent event on the Events tab that builds the habit of training consistent
 - **Rank (1–20)** measures recent consistency. It rises and falls.
 - **The expedition map** measures total effort. Its progress is permanent.
 
-**Status:** Phases 1 and 2 are built: navigation, fitness tagging and logging, rank and the weekly reset, the expedition map with gates and rewards, selectors, titles, weekly rewards and the weekly report. Phase 3 is map visual polish (and the Endgame theme's look).
+**Status:** All three phases are built: navigation, fitness tagging and logging, rank and the weekly reset, the expedition map with gates and rewards, selectors, titles, weekly rewards, the weekly report, the drawn frontier map and the Endgame theme.
 
 Every number lives in `src/config.ts` (`FITNESS`, `RANK`, `EXPEDITION`, `WEEKLY_REWARDS`). The rank math is in `src/logic/rank.ts`; the event state, weekly reset and weekly rewards are in `src/logic/event.ts`; and the map is in `src/logic/expedition.ts`.
 
@@ -13,12 +13,14 @@ Every number lives in `src/config.ts` (`FITNESS`, `RANK`, `EXPEDITION`, `WEEKLY_
 
 | Type | Points | Notes |
 |---|---|---|
-| CrossFit | 100 | |
-| Shoulder PT | 50 | |
-| Other workout | 75 | logged by hand |
-| Activity (dog walk, extra walk, …) | 10 | only the first 7 per week count |
+| Major activity (e.g. CrossFit) | 100 | |
+| Other workout | 75 | |
+| Moderate activity (e.g. shoulder PT) | 50 | |
+| Minor activity (e.g. dog walk, extra walk) | 10 | only the first 7 per week count |
 
-- **Tagged tasks:** template tasks can have a fitness type (set in the template editor). Checking one off logs its points automatically, and undoing the task removes them. The starting template tags CrossFit, Shoulder PT and Dog walk.
+The types are named by effort rather than by a specific workout, so the routine can change without renaming anything. In the saved data they keep their original codes (`crossfit`, `workout`, `pt`, `activity`), so renaming them needed no data upgrade.
+
+- **Tagged tasks:** template tasks can have a fitness type (set in the template editor). Checking one off logs its points automatically, and undoing the task removes them. The starting template tags CrossFit as Major, Shoulder PT as Moderate and Dog walk as Minor.
 - **Manual logs:** "Log activity" on the event screen records anything outside the schedule. Manual entries can be undone the same day.
 - **Where they're recorded:** fitness points have their own log (History → Fitness), not the currency ledger.
 
@@ -29,7 +31,7 @@ The week runs Monday 4:00 AM to Monday 4:00 AM. At each reset:
 - `RP = RP × (1 − decay) + this week's points`
 - `Rank = floor(20 × RP / RP_max)`, between 1 and 20
 - `RP_max = 0.9 × (target week points ÷ 0.10)`
-- **Target week:** set in Settings. The default is 3 CrossFit + 3 PT + 7 activities = 520 points, so RP_max is 4,680. Changing the target rescales your rank immediately, so Rank 20 always means "doing my full routine consistently".
+- **Target week:** set in Settings. The default is 3 Major + 3 Moderate + 7 Minor = 520 points, so RP_max is 4,680. Changing the target rescales your rank immediately, so Rank 20 always means "doing my full routine consistently".
 - **Decay:** 10% normally. A week is **weak** if its points are below RP × 10%. Consecutive weak weeks decay 10%, then 15%, then 25% from the third week on. One non-weak week resets decay to normal. There are no rank floors.
 - **Missed weeks:** weeks you don't open the app are processed when you next open it, as zero-point weeks.
 
@@ -67,6 +69,14 @@ Checked by unit tests (`tests/rank.test.ts`):
 - **Carry-over:** points earned while a gate is closed are banked, and the map catches up once your rank meets the gate. The map only moves forward, so a rank drop, or undoing a session after the map moved, never takes anything back, and points that return after an undo don't pay twice.
 - **Pace:** at target pace, regions finish at weeks 3, 6, 11, 20 and 26 (checked by a test that runs the real code for 30 weeks). The Endgame takes about 4 weeks at Rank 20, which was decided as fine.
 - **Live movement:** the map moves as you log sessions, and the app announces each node you reach.
+- **The drawing:** one tall map you scroll inside a window, opening at your position. The route climbs from the Outskirts at the bottom to a beacon at the top of the Endgame. The stretch you've covered glows; the rest is dashed. Each region has its own original, procedurally placed terrain:
+  - Outskirts: hills and outposts;
+  - Badlands: mesas and cracks;
+  - Deep Frontier: pine ridges;
+  - The Wall: cliff strata;
+  - Endgame: crystal spires.
+
+  A pulsing marker shows where you are, and the next locked rank gate is a hazard-striped barrier across the route. Tap any node for its reward and distance.
 - **Nodes:** spaced evenly within each region, about every 260 points (52 in all, 11 of them Caches).
   - **Regular node:** 250 Sparks.
   - **Every 4th node across the map (Cache):** 1,000 Sparks + 5 Shards.
@@ -75,7 +85,7 @@ Checked by unit tests (`tests/rank.test.ts`):
   - **End of the Endgame:** a 5★ selector, an exclusive UI theme and a completion record (date, peak rank, total sessions, weeks taken).
 - **Selectors** go into the Bag (top of Indulgences) until used. Choosing one adds that indulgence to your inventory.
 - **Titles:** a newly earned title is shown straight away, under the brand and on the event screen. You can change or hide it in Settings.
-- **The theme:** a Settings switch once unlocked. For now it's a gold and deep-blue palette; phase 3 polishes it.
+- **The Endgame theme:** a Settings switch once unlocked. It's midnight blue and gold, with a gold glow across the app, gold-edged panels and a gold brand mark.
 
 ## Weekly rewards
 

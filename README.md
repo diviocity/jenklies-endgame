@@ -2,7 +2,7 @@
 
 A personal iPhone web app that turns my daily schedule into a gacha game. I complete my tasks, earn currency (with a bonus for doing them on time), and spend it on pulls. Rare pulls give **indulgences**: treats I've defined for myself and redeem in my free time. Common pulls give collectible **positive affirmations**. It's for me only: no accounts, no server, no monetization.
 
-**Status:** Phases 1 (the core loop) and 2 (the pull animation) are built. The **Frontier Expedition** fitness event is in progress (phases 1–2 of 3 built); see [docs/frontier-expedition.md](docs/frontier-expedition.md). Streaks, stats and the calendar come later.
+**Status:** Phases 1 (the core loop) and 2 (the pull animation) are built. The **Frontier Expedition** fitness event is built; see [docs/frontier-expedition.md](docs/frontier-expedition.md). Streaks, stats and the calendar come later.
 
 - [Using it](#using-it) · [Development](#development) · [Design decisions](#design-decisions) · [Project brief](#project-brief)
 
