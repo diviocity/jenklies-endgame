@@ -1514,147 +1514,281 @@ span.r5 {
   color: var(--ok);
 }
 
-.regions {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.region {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 0 10px;
+/* The frontier map: one tall drawing in a scrolling window. Original, procedural terrain. */
+.map-window {
+  position: relative;
+  height: min(460px, 58vh);
+  margin: 0 -14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
 }
 
-.region-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+.frontier {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
-.region-head b {
-  flex: 1;
-  font-size: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.band-fill {
+  fill: transparent;
 }
 
-.region-no {
-  font-size: 12px;
-  color: var(--accent);
+.band-1 .band-fill {
+  fill: rgba(232, 165, 75, 0.035);
 }
 
-.region.locked .region-head b,
-.region.ahead .region-head b {
-  color: var(--muted);
+.band-2 .band-fill {
+  fill: rgba(111, 220, 152, 0.03);
 }
 
-.region-chip {
+.band-3 .band-fill {
+  fill: rgba(78, 168, 255, 0.035);
+}
+
+.band-4 .band-fill {
+  fill: rgba(255, 201, 58, 0.05);
+}
+
+.band-edge {
+  stroke: var(--line-2);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
+}
+
+.band-label {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  fill: var(--muted);
+}
+
+.band-rank {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  fill: var(--dim);
+}
+
+.band.cleared .band-rank {
+  fill: var(--ok);
+}
+
+.band-rank.locked {
+  fill: var(--late);
+}
+
+.band.locked .terrain {
+  opacity: 0.45;
+}
+
+.terrain {
+  fill: none;
+  stroke: var(--line-2);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.terrain.contour {
+  stroke: var(--line);
+  stroke-width: 0.8;
+  opacity: 0.6;
+}
+
+.terrain.outpost,
+.terrain.mesa {
+  fill: var(--panel-2);
+}
+
+.terrain.crack {
+  stroke: #5a4a33;
+}
+
+.terrain.pine {
+  fill: #18241e;
+  stroke: #2f4a3b;
+}
+
+.terrain.strata {
+  stroke: #34507a;
+  stroke-width: 1.5;
+}
+
+.terrain.spire {
+  fill: rgba(255, 201, 58, 0.08);
+  stroke: rgba(255, 201, 58, 0.45);
+}
+
+.beacon polygon {
+  fill: var(--r5);
+  filter: drop-shadow(0 0 6px var(--r5));
+}
+
+.beacon line {
+  stroke: var(--r5);
+  stroke-width: 2;
+}
+
+.route {
+  fill: none;
+  stroke: var(--line-2);
+  stroke-width: 2;
+  stroke-dasharray: 5 5;
+  stroke-linecap: round;
+}
+
+.route-done {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px rgba(244, 209, 58, 0.55));
+}
+
+.hazard-a {
+  fill: var(--late);
+}
+
+.hazard-b {
+  fill: #1a1408;
+}
+
+.gate-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  fill: var(--late);
+}
+
+.node {
+  cursor: pointer;
+}
+
+.node:focus {
+  outline: none;
+}
+
+.node .hit {
+  fill: transparent;
+}
+
+.node polygon {
+  fill: var(--panel);
+  stroke: var(--line-2);
+  stroke-width: 1.5;
+}
+
+.node.reached polygon {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.node.cache polygon {
+  stroke: #7fe0ff;
+}
+
+.node.cache.reached polygon {
+  fill: #7fe0ff;
+  stroke: #7fe0ff;
+}
+
+.node.regionEnd polygon,
+.node.final polygon {
+  stroke: var(--r5);
+  stroke-width: 2;
+}
+
+.node.regionEnd.reached polygon,
+.node.final.reached polygon {
+  fill: var(--r5);
+}
+
+.node-star {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  text-anchor: middle;
+  fill: var(--r5);
+  pointer-events: none;
+}
+
+.node.reached .node-star {
+  fill: var(--accent-ink);
+}
+
+.node.focus polygon,
+.node:focus-visible polygon {
+  stroke: var(--text);
+  stroke-width: 2.5;
+}
+
+.you-dot {
+  fill: var(--text);
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.you-pulse {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: you-pulse 1.8s ease-out infinite;
+}
+
+@keyframes you-pulse {
+  from {
+    opacity: 0.9;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+.node-detail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+}
+
+.node-detail b {
+  display: block;
+  font-size: 14.5px;
+}
+
+.node-detail small {
+  font-size: 11.5px;
+}
+
+.node-badge {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 2px 6px;
+  padding: 3px 6px;
   border: 1px solid var(--line-2);
   color: var(--muted);
 }
 
-.region-chip.cleared {
-  color: var(--ok);
-  border-color: var(--ok);
-}
-
-.region-chip.active {
-  color: var(--accent-ink);
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.region-chip.locked {
-  color: var(--late);
-  border-color: var(--late);
-  border-style: dashed;
-}
-
-/* The route through a region: a line with its nodes placed by distance. */
-.region-track {
-  position: relative;
-  height: 22px;
-  margin: 0 9px;
-  background: linear-gradient(var(--line-2), var(--line-2)) center / 100% 2px no-repeat;
-}
-
-.region.locked .region-track {
-  background: repeating-linear-gradient(90deg, var(--line-2) 0 6px, transparent 6px 10px) center / 100% 2px no-repeat;
-}
-
-.region-fill {
-  position: absolute;
-  left: 0;
-  top: 10px;
-  height: 2px;
-  background: var(--accent);
-}
-
-.map-node {
-  position: absolute;
-  top: 50%;
-  width: 10px;
-  height: 10px;
-  margin: -5px 0 0 -5px;
-  display: grid;
-  place-items: center;
-  border: 1.5px solid var(--line-2);
-  background: var(--panel);
-  transform: rotate(45deg);
-  font-size: 0;
-}
-
-.map-node.reached {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.map-node.cache {
-  width: 12px;
-  height: 12px;
-  margin: -6px 0 0 -6px;
+.node-badge.cache {
+  color: #7fe0ff;
   border-color: #7fe0ff;
 }
 
-.map-node.cache.reached {
-  background: #7fe0ff;
-}
-
-.map-node.regionEnd,
-.map-node.final {
-  width: 16px;
-  height: 16px;
-  margin: -8px 0 0 -8px;
+.node-badge.regionEnd,
+.node-badge.final {
+  color: var(--r5);
   border-color: var(--r5);
-  border-width: 2px;
-}
-
-.map-node.regionEnd.reached,
-.map-node.final.reached {
-  background: var(--r5);
-}
-
-.map-node.next {
-  border-color: var(--text);
-  box-shadow: 0 0 0 3px rgba(244, 209, 58, 0.25);
-  animation: node-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes node-pulse {
-  50% {
-    box-shadow: 0 0 0 6px rgba(244, 209, 58, 0.08);
-  }
 }
 
 .title-line {
@@ -1733,16 +1867,54 @@ span.r5 {
   color: var(--r5);
 }
 
-/* The Endgame theme, unlocked by finishing the expedition (phase 3 will polish it). */
+/* The Endgame theme, unlocked by finishing the expedition: midnight blue and gold. */
 :root[data-theme='endgame'] {
-  --bg: #090b10;
-  --bg-2: #0e1118;
-  --panel: #121722;
-  --panel-2: #18202e;
-  --line: #243046;
-  --line-2: #34435e;
+  --bg: #080a12;
+  --bg-2: #0d1120;
+  --panel: #111729;
+  --panel-2: #172038;
+  --line: #222d4a;
+  --line-2: #33426a;
+  --muted: #9aa3bd;
+  --dim: #5f6a8a;
   --accent: #ffc93a;
-  --accent-2: #ffe08a;
+  --accent-2: #ffe7a3;
+}
+
+:root[data-theme='endgame'] .app {
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(255, 201, 58, 0.12), transparent 60%),
+    radial-gradient(80% 40% at 100% 100%, rgba(120, 140, 255, 0.08), transparent 70%),
+    linear-gradient(transparent 0 calc(100% - 1px), rgba(255, 201, 58, 0.035) 0) 0 0 / 100% 24px,
+    linear-gradient(90deg, transparent 0 calc(100% - 1px), rgba(255, 201, 58, 0.035) 0) 0 0 / 24px 100%,
+    var(--bg);
+}
+
+:root[data-theme='endgame'] .panel {
+  border-color: rgba(255, 201, 58, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 231, 163, 0.06);
+}
+
+:root[data-theme='endgame'] .brand-mark {
+  background: linear-gradient(135deg, var(--accent-2), var(--accent) 55%, #b8861a);
+  box-shadow: 0 0 10px rgba(255, 201, 58, 0.45);
+}
+
+:root[data-theme='endgame'] .topbar,
+:root[data-theme='endgame'] .tabbar {
+  background: #090c16;
+}
+
+:root[data-theme='endgame'] .tabbar a.on svg {
+  filter: drop-shadow(0 0 4px rgba(255, 201, 58, 0.6));
+}
+
+:root[data-theme='endgame'] .btn.primary {
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+}
+
+:root[data-theme='endgame'] .map-window {
+  background: radial-gradient(100% 30% at 50% 0, rgba(255, 201, 58, 0.08), transparent 70%), var(--bg);
 }
 
 /* ---------------------------------------------------------------- more */

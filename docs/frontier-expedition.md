@@ -5,7 +5,7 @@ A permanent event on the Events tab that builds the habit of training consistent
 - **Rank (1–20)** measures recent consistency. It rises and falls.
 - **The expedition map** measures total effort. Its progress is permanent.
 
-**Status:** Phases 1 and 2 are built: navigation, fitness tagging and logging, rank and the weekly reset, the expedition map with gates and rewards, selectors, titles, weekly rewards and the weekly report. Phase 3 is map visual polish (and the Endgame theme's look).
+**Status:** All three phases are built: navigation, fitness tagging and logging, rank and the weekly reset, the expedition map with gates and rewards, selectors, titles, weekly rewards, the weekly report, the drawn frontier map and the Endgame theme.
 
 Every number lives in `src/config.ts` (`FITNESS`, `RANK`, `EXPEDITION`, `WEEKLY_REWARDS`). The rank math is in `src/logic/rank.ts`; the event state, weekly reset and weekly rewards are in `src/logic/event.ts`; and the map is in `src/logic/expedition.ts`.
 
@@ -69,6 +69,14 @@ Checked by unit tests (`tests/rank.test.ts`):
 - **Carry-over:** points earned while a gate is closed are banked, and the map catches up once your rank meets the gate. The map only moves forward, so a rank drop, or undoing a session after the map moved, never takes anything back, and points that return after an undo don't pay twice.
 - **Pace:** at target pace, regions finish at weeks 3, 6, 11, 20 and 26 (checked by a test that runs the real code for 30 weeks). The Endgame takes about 4 weeks at Rank 20, which was decided as fine.
 - **Live movement:** the map moves as you log sessions, and the app announces each node you reach.
+- **The drawing:** one tall map you scroll inside a window, opening at your position. The route climbs from the Outskirts at the bottom to a beacon at the top of the Endgame. The stretch you've covered glows; the rest is dashed. Each region has its own original, procedurally placed terrain:
+  - Outskirts: hills and outposts;
+  - Badlands: mesas and cracks;
+  - Deep Frontier: pine ridges;
+  - The Wall: cliff strata;
+  - Endgame: crystal spires.
+
+  A pulsing marker shows where you are, and the next locked rank gate is a hazard-striped barrier across the route. Tap any node for its reward and distance.
 - **Nodes:** spaced evenly within each region, about every 260 points (52 in all, 11 of them Caches).
   - **Regular node:** 250 Sparks.
   - **Every 4th node across the map (Cache):** 1,000 Sparks + 5 Shards.
@@ -77,7 +85,7 @@ Checked by unit tests (`tests/rank.test.ts`):
   - **End of the Endgame:** a 5★ selector, an exclusive UI theme and a completion record (date, peak rank, total sessions, weeks taken).
 - **Selectors** go into the Bag (top of Indulgences) until used. Choosing one adds that indulgence to your inventory.
 - **Titles:** a newly earned title is shown straight away, under the brand and on the event screen. You can change or hide it in Settings.
-- **The theme:** a Settings switch once unlocked. For now it's a gold and deep-blue palette; phase 3 polishes it.
+- **The Endgame theme:** a Settings switch once unlocked. It's midnight blue and gold, with a gold glow across the app, gold-edged panels and a gold brand mark.
 
 ## Weekly rewards
 
