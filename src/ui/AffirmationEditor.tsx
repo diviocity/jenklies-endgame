@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import { affirmationCounts, saveAffirmation, setAffirmationRemoved } from '../logic/actions';
 import { sortByOrder } from '../logic/state';
 import { run, useStore } from '../store';
-import { BackLink, PageTitle, report, Sheet } from './common';
+import { BackLink, PageTitle, Sheet, succeeded, useSaving } from './common';
 
 type Draft = { id?: string; text: string; removed: boolean };
 
@@ -59,12 +59,12 @@ function AffirmationSheet(props: { draft: Draft; onClose: () => void }) {
   const [text, setText] = useState(props.draft.text);
   const { id, removed } = props.draft;
 
-  const save = async (e: Event) => {
+  const [saving, save] = useSaving(async (e: Event) => {
     e.preventDefault();
-    if (report(await run((s, now) => saveAffirmation(s, { id, text }, now))) !== undefined) props.onClose();
-  };
+    if (succeeded(await run((s, now) => saveAffirmation(s, { id, text }, now)))) props.onClose();
+  });
   const toggle = async () => {
-    if (report(await run((s) => setAffirmationRemoved(s, id!, !removed))) !== undefined) props.onClose();
+    if (succeeded(await run((s) => setAffirmationRemoved(s, id!, !removed)))) props.onClose();
   };
 
   return (
@@ -74,8 +74,8 @@ function AffirmationSheet(props: { draft: Draft; onClose: () => void }) {
           <span>Text</span>
           <textarea rows={3} maxLength={240} value={text} required onInput={(e) => setText(e.currentTarget.value)} />
         </label>
-        <button class="btn primary wide" type="submit">
-          Save
+        <button class="btn primary wide" type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
         </button>
         {id && (
           <button type="button" class={`btn wide ${removed ? 'ghost' : 'danger-ghost'}`} onClick={toggle}>

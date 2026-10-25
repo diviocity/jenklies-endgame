@@ -1,6 +1,6 @@
 import type { ComponentChildren } from 'preact';
 import { createPortal } from 'preact/compat';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { getMeta } from '../logic/state';
 import { getState, tick } from '../store';
 import type { Rarity } from '../types';
@@ -56,6 +56,33 @@ export function report<T>(outcome: { ok: true; result: T } | { ok: false; error:
     return undefined;
   }
   return outcome.result;
+}
+
+/** Like report, for actions with no result: whether it worked (errors are shown as a toast). */
+export function succeeded(outcome: { ok: true } | { ok: false; error: string }): boolean {
+  if (!outcome.ok) toast(outcome.error, 'error');
+  return outcome.ok;
+}
+
+/**
+ * Guards a save so a second tap while the first is still saving does nothing.
+ * Returns whether a save is running (to disable the button) and the guarded handler.
+ */
+export function useSaving<A extends unknown[]>(fn: (...args: A) => Promise<void>): [boolean, (...args: A) => Promise<void>] {
+  const running = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const guarded = async (...args: A) => {
+    if (running.current) return;
+    running.current = true;
+    setSaving(true);
+    try {
+      await fn(...args);
+    } finally {
+      running.current = false;
+      setSaving(false);
+    }
+  };
+  return [saving, guarded];
 }
 
 export function UiHost() {

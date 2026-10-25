@@ -8,7 +8,7 @@ import { useSelector } from '../logic/expedition';
 import type { Indulgence, Selector } from '../types';
 import { AffirmationCollection } from './Collection';
 import { Redemptions } from './History';
-import { Amount, confirmDialog, Empty, names, PageTitle, report, Segmented, Sheet, Stars, toast } from './common';
+import { Amount, confirmDialog, Empty, names, PageTitle, report, Segmented, Sheet, Stars, succeeded, toast } from './common';
 
 export type BagView = View;
 type View = 'inventory' | 'affirmations' | 'shop' | 'log';
@@ -64,7 +64,7 @@ function Inventory() {
     });
     if (!ok) return;
     play('buy');
-    if (report(await run((s, now) => redeem(s, item.id, now))) !== undefined) toast(`Redeemed: ${item.name}`, 'good');
+    if (succeeded(await run((s, now) => redeem(s, item.id, now)))) toast(`Redeemed: ${item.name}`, 'good');
   };
 
   const selectors = [...state.selectors.values()].filter((sel) => !sel.usedAt);
@@ -173,7 +173,7 @@ function Shop() {
     });
     if (!ok) return;
     play('buy');
-    if (report(await run((s, now) => buy(s, item.id, now))) !== undefined) toast(`Bought: ${item.name}`, 'good');
+    if (succeeded(await run((s, now) => buy(s, item.id, now)))) toast(`Bought: ${item.name}`, 'good');
   };
 
   return (
