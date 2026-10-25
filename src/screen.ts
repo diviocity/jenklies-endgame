@@ -44,12 +44,22 @@ export function fitToScreen(): void {
   }
 }
 
+/** A field that brings up the keyboard. */
+function isTyping(): boolean {
+  const el = document.activeElement;
+  if (el instanceof HTMLTextAreaElement) return true;
+  if (el instanceof HTMLElement && el.isContentEditable) return true;
+  return el instanceof HTMLInputElement && !['checkbox', 'radio', 'button', 'submit', 'range', 'color', 'file'].includes(el.type);
+}
+
 /**
  * When fitted, the page is taller than the height iOS reports, so it could scroll by a
  * status bar's worth. Content scrolls inside the app, so keep the page itself at the top.
+ * While typing, iOS scrolls the page to lift the field above the keyboard, so leave it be
+ * and settle back once the field loses focus.
  */
 function keepPageAtTop(): void {
-  if (fitted && (scrollX !== 0 || scrollY !== 0)) scrollTo(0, 0);
+  if (fitted && !isTyping() && (scrollX !== 0 || scrollY !== 0)) scrollTo(0, 0);
 }
 
 export function watchScreen(): void {
@@ -57,6 +67,8 @@ export function watchScreen(): void {
   addEventListener('resize', fitToScreen);
   addEventListener('orientationchange', fitToScreen);
   addEventListener('scroll', keepPageAtTop, { passive: true });
+  // After the keyboard closes; wait a tick so moving between fields doesn't jump.
+  addEventListener('focusout', () => setTimeout(keepPageAtTop, 100));
 }
 
 /** Measures a CSS length by applying it to a hidden element. */
