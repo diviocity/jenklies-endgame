@@ -4,7 +4,7 @@ A permanent event on the Events tab that gets my backlog of things to sell out o
 
 It works with any platform: eBay, Facebook Marketplace, Facebook groups, Discord selling servers, or anything I add.
 
-**Status:** Phase 1 is built: the catalog, stages, platforms, featured lots, per-item rewards, the weekly mission and the listing prompt. Phase 2 adds lifetime milestones (selectors, titles and the Market theme) and the money record.
+**Status:** Built. Phase 1 added the catalog, stages, platforms, featured lots, per-item rewards, the weekly mission and the listing prompt; phase 2 added lifetime milestones (selectors, titles and the Market theme) and the money record.
 
 Every number lives in `src/config.ts` (`DEPOT`). The rules are in `src/logic/depot.ts` and the screen is `src/ui/Salvage.tsx`.
 
@@ -54,7 +54,42 @@ Each is paid once per item, ever, and logged in the currency ledger.
 - The lots that count are every lot that was featured at any point that week, deleted ones excepted. With one slot filled, listing that one completes it. With no featured lots there's no mission.
 - The result appears in the weekly report on the first open after the reset.
 
+### Lifetime milestones
+
+Counted in items, so adding items never sets progress back, and deleting an item never lowers the counts. A sale counts once the item is handed off.
+
+**Listings**
+
+| Items listed | Reward |
+|---|---|
+| 1st | 4★ selector |
+| 10th | 5★ selector |
+
+**Sales (handed off)**
+
+| Items sold | Reward |
+|---|---|
+| 1st | 1,000 Sparks + "Open for Business" title |
+| 5th | 4★ selector |
+| 15th | 5★ selector |
+| 20th | "Quartermaster" title + the Market theme |
+| 30th, 40th, 50th… | 5★ selector each |
+
+- **When they pay:** the moment the listing or hand-off that reaches them is marked, with a message saying what you got. Selectors go into the Bag, the same as the expedition's.
+- **Undo:** undoing that listing or hand-off the same day takes the milestone back too (its selector, Sparks, title and theme). If the selector has already been opened, the undo is blocked instead.
+- **Titles** from both events share one list. A new one is shown under the brand straight away; change or hide it in Settings.
+- **The Market theme:** copper and teal, picked in Settings next to Default (and Endgame once the expedition is finished).
+- **The event screen** shows progress toward the next listing and sales milestone, and every milestone reached.
+
 **Pace:** listing both featured lots fresh, photographing two items and handing off two sales comes to about 3,700 Sparks and 9 Shards a week (7–8 pulls). It tapers off as the backlog clears.
+
+## Money record
+
+Information only; never used in reward math. A sale counts here as soon as it's marked sold.
+
+- Gross sales, fees and net, with the number of sales.
+- Breakdowns by platform and by month.
+- Average days from first listing to sale. Items marked sold without being listed first are left out of the average, since they'd count as 0 days.
 
 ## Data
 
@@ -62,6 +97,6 @@ Each is paid once per item, ever, and logged in the currency ledger.
   - `saleItems`: each item with its stage timestamps, platforms, sale record, which rewards it has paid, and today's stage changes (for undo);
   - `featuredSlots`: one record per stint in a slot (item, slot, start, end, and whether it left by being listed or deleted). This is the slot history;
   - `depotWeeks`: one record per closed week with its mission result and reward;
-  - `depot`: the event state (current week, my own platforms, and lifetime listed and handed-off counts, which deleting never lowers).
-- **Upgrading:** existing data needs no changes; the new stores start empty. Older backups import with them empty.
+  - `depot`: the event state (current week, my own platforms, lifetime listed and handed-off counts, which deleting never lowers, and the milestones, titles and themes earned).
+- **Upgrading:** existing data needs no changes; the new stores start empty. Older backups import with them empty. Milestones reached before milestones existed are claimed on the next open.
 - **Export/import** includes all Salvage Exchange data.

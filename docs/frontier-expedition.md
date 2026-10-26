@@ -85,7 +85,7 @@ Checked by unit tests (`tests/rank.test.ts`):
   - **End of the Endgame:** a 5★ selector, an exclusive UI theme and a completion record (date, peak rank, total sessions, weeks taken).
 - **Selectors** go into the Bag (top of Indulgences) until used. Choosing one adds that indulgence to your inventory.
 - **Titles:** a newly earned title is shown straight away, under the brand and on the event screen. You can change or hide it in Settings.
-- **The Endgame theme:** a Settings switch once unlocked. It's midnight blue and gold, with a gold glow across the app, gold-edged panels and a gold brand mark.
+- **The Endgame theme:** picked in Settings once unlocked (alongside the Salvage Exchange's Market theme). It's midnight blue and gold, with a gold glow across the app, gold-edged panels and a gold brand mark.
 
 ## Weekly rewards
 

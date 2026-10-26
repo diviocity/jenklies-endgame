@@ -12,6 +12,9 @@ import {
   markHandedOff,
   markPhotographed,
   markSold,
+  milestonesThrough,
+  moneyRecord,
+  nextMilestone,
   parseDollars,
   saleFellThrough,
   saveSaleItem,
@@ -20,6 +23,8 @@ import {
   undoStep,
 } from '../src/logic/depot';
 import type { ActionResult } from '../src/logic/errors';
+import { ensureEvent, frontier } from '../src/logic/event';
+import { earnedTitles, unlockedThemes } from '../src/logic/honors';
 import { applyChanges, emptyState, put, seedChanges } from '../src/logic/state';
 import type { AppState } from '../src/types';
 
@@ -34,6 +39,7 @@ function setup(now = at(26, 9)): AppState {
 }
 
 function tick(state: AppState, now: Date) {
+  applyChanges(state, ensureEvent(state, now));
   applyChanges(state, ensureDepot(state, now));
 }
 
@@ -321,5 +327,155 @@ describe('weekly mission', () => {
     expect([...state.depotWeeks.keys()].sort()).toEqual(['2026-10-26', '2026-11-02', '2026-11-09', '2026-11-16']);
     expect(depot(state)!.currentWeek).toBe('2026-11-23');
     expect(featuredNames(state)).toEqual(['A']);
+  });
+});
+
+/** Lists (and optionally sells and hands off) `n` new items, one per hour on the Monday. */
+function clear(state: AppState, n: number, handOff = true) {
+  for (let i = 0; i < n; i++) {
+    const now = at(26, 5, i); // minutes apart, same day
+    const id = add(state, `Thing ${i}`, now);
+    run(state, listItem(state, id, ['eBay'], now));
+    if (handOff) {
+      run(state, markSold(state, id, { price: '10', platform: 'eBay', fees: '1' }, now));
+      run(state, markHandedOff(state, id, now));
+    }
+  }
+}
+
+const selectors = (state: AppState) => [...state.selectors.values()].map((s) => `${s.rarity}★ ${s.source}`);
+
+describe('milestones', () => {
+  it('has the agreed thresholds, with a 5★ selector every 10 sales after the 20th', () => {
+    expect(milestonesThrough('listed', 50).map((m) => m.id)).toEqual(['listed-1', 'listed-10']);
+    expect(milestonesThrough('sold', 50).map((m) => [m.id, m.selector, m.title, m.theme])).toEqual([
+      ['sold-1', null, 'Open for Business', null],
+      ['sold-5', 4, null, null],
+      ['sold-15', 5, null, null],
+      ['sold-20', null, 'Quartermaster', 'market'],
+      ['sold-30', 5, null, null],
+      ['sold-40', 5, null, null],
+      ['sold-50', 5, null, null],
+    ]);
+    expect(milestonesThrough('sold', 1)[0].sparks).toBe(1_000);
+    expect(nextMilestone('listed', 9)?.id).toBe('listed-10');
+    expect(nextMilestone('listed', 10)).toBeNull();
+    expect(nextMilestone('sold', 20)?.id).toBe('sold-30');
+    expect(nextMilestone('sold', 34)?.id).toBe('sold-40');
+  });
+
+  it('the 1st and 10th listings give a 4★ and a 5★ selector', () => {
+    const state = setup();
+    clear(state, 1, false);
+    expect(selectors(state)).toEqual(['4★ Salvage Exchange: 1st listing milestone']);
+    clear(state, 9, false);
+    expect(selectors(state)).toContain('5★ Salvage Exchange: 10th listing milestone');
+    expect(depot(state)!.milestones).toEqual(['listed-1', 'listed-10']);
+  });
+
+  it('the 1st sale pays 1,000 and the title, shown straight away', () => {
+    const state = setup();
+    const before = sparks(state);
+    const id = add(state, 'Lamp', at(26, 10));
+    run(state, listItem(state, id, ['eBay'], at(26, 10)));
+    run(state, markSold(state, id, { price: '10', platform: 'eBay', fees: '' }, at(26, 11)));
+    const result = run(state, markHandedOff(state, id, at(26, 12)));
+    expect(result.milestones.map((m) => m.id)).toEqual(['sold-1']);
+    expect(sparks(state) - before).toBe(1_100 + 500 + 1_000);
+    expect(earnedTitles(state)).toEqual(['Open for Business']);
+    expect(frontier(state)!.activeTitle).toBe('Open for Business');
+  });
+
+  it('the 20th sale gives Quartermaster and the Market theme; then a 5★ every 10', () => {
+    const state = setup();
+    clear(state, 20);
+    expect(earnedTitles(state)).toEqual(['Open for Business', 'Quartermaster']);
+    expect(unlockedThemes(state)).toEqual(['market']);
+    expect(frontier(state)!.activeTitle).toBe('Quartermaster');
+    clear(state, 10);
+    expect(depot(state)!.milestones).toContain('sold-30');
+    expect(selectors(state).filter((s) => s.startsWith('5★')).length).toBe(3); // 10th listing, 15th sale, 30th sale
+  });
+
+  it('claims each milestone once, even after deleting items', () => {
+    const state = setup();
+    clear(state, 1);
+    for (const id of [...state.saleItems.keys()]) run(state, deleteSaleItem(state, id, at(27)));
+    clear(state, 1);
+    expect(selectors(state)).toEqual(['4★ Salvage Exchange: 1st listing milestone']);
+    expect(depot(state)).toMatchObject({ listedCount: 2, handedOffCount: 2 });
+  });
+
+  it('undo takes the milestone back: selector, Sparks, title', () => {
+    const state = setup();
+    const id = add(state, 'Lamp', at(26, 10));
+    run(state, listItem(state, id, ['eBay'], at(26, 10)));
+    run(state, undoStep(state, id, at(26, 11)));
+    expect(state.selectors.size).toBe(0);
+    expect(depot(state)!.milestones).toEqual([]);
+    run(state, listItem(state, id, ['eBay'], at(26, 12)));
+    run(state, markSold(state, id, { price: '10', platform: 'eBay', fees: '' }, at(26, 13)));
+    run(state, markHandedOff(state, id, at(26, 14)));
+    const before = sparks(state);
+    run(state, undoStep(state, id, at(26, 15)));
+    expect(before - sparks(state)).toBe(500 + 1_000);
+    expect(earnedTitles(state)).toEqual([]);
+    expect(frontier(state)!.activeTitle).toBeNull();
+  });
+
+  it('undo is blocked once the milestone’s selector has been opened', () => {
+    const state = setup();
+    const id = add(state, 'Lamp', at(26, 10));
+    run(state, listItem(state, id, ['eBay'], at(26, 10)));
+    const [sel] = state.selectors.values();
+    applyChanges(state, [put('selectors', { ...sel, usedAt: at(26, 11).toISOString(), indulgenceId: 'x', name: 'x' })]);
+    expect(() => undoStep(state, id, at(26, 12))).toThrow('already been opened');
+  });
+
+  it('undoing the 20th sale switches the Market theme back off', () => {
+    const state = setup();
+    clear(state, 20);
+    const meta = state.meta.get('meta')!;
+    applyChanges(state, [put('meta', { ...meta, settings: { ...meta.settings, theme: 'market' } })]);
+    const last = [...state.saleItems.values()].find((i) => i.name === 'Thing 19')!;
+    run(state, undoStep(state, last.id, at(26, 9)));
+    expect(unlockedThemes(state)).toEqual([]);
+    expect(state.meta.get('meta')!.settings.theme).toBe('default');
+    expect(frontier(state)!.activeTitle).toBe('Open for Business');
+  });
+
+  it('catches up on milestones reached before they existed', () => {
+    const state = setup();
+    const d = depot(state)!;
+    applyChanges(state, [put('depot', { ...d, listedCount: 3, handedOffCount: 1, milestones: undefined })]);
+    tick(state, at(26, 13));
+    expect(depot(state)!.milestones).toEqual(['listed-1', 'sold-1']);
+    expect(state.selectors.size).toBe(1);
+    expect(earnedTitles(state)).toEqual(['Open for Business']);
+  });
+});
+
+describe('money record', () => {
+  it('totals sales, fees and net, by platform and month, with days to sell', () => {
+    const state = setup();
+    const a = add(state, 'A', at(26, 10));
+    run(state, listItem(state, a, ['eBay'], at(26, 10)));
+    run(state, markSold(state, a, { price: '40', platform: 'eBay', fees: '5.20' }, at(30, 10))); // 4 days
+    const b = add(state, 'B', at(26, 10));
+    run(state, listItem(state, b, ['Discord'], at(26, 10)));
+    run(state, markSold(state, b, { price: '25.50', platform: 'Discord', fees: '' }, at(33, 10))); // Nov 2, 7 days
+    const c = add(state, 'C', at(26, 10));
+    run(state, markSold(state, c, { price: '10', platform: 'eBay', fees: '' }, at(28, 10))); // never listed first
+    const money = moneyRecord(state);
+    expect(money.total).toMatchObject({ count: 3, gross: 7_550, fees: 520, net: 7_030 });
+    expect(money.byPlatform.map((l) => [l.key, l.count, l.net])).toEqual([
+      ['eBay', 2, 4_480],
+      ['Discord', 1, 2_550],
+    ]);
+    expect(money.byMonth.map((l) => [l.key, l.count])).toEqual([
+      ['2026-11', 1],
+      ['2026-10', 2],
+    ]);
+    expect(money.avgDaysToSell).toBeCloseTo(5.5, 5);
   });
 });

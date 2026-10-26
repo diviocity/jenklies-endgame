@@ -5,13 +5,19 @@ import { backupFileName, buildBackup, parseBackup, summarizeBackup } from '../lo
 import { getMeta } from '../logic/state';
 import { BUCKET_LABELS, formatDateTime, inputToMinutes, minutesToInput, WEEKDAY_BUCKETS, WEEKEND_BUCKETS } from '../logic/time';
 import { getState, importBackup, run, useStore } from '../store';
-import type { BucketId, FitnessTarget, Settings } from '../types';
+import type { BucketId, FitnessTarget, Settings, ThemeId } from '../types';
 import { canIgnoreSilentMode } from '../sound';
 import { frontier } from '../logic/event';
 import { setActiveTitle } from '../logic/expedition';
+import { earnedTitles, unlockedThemes } from '../logic/honors';
 import { screenReport } from '../screen';
 import { FITNESS_LABELS, FITNESS_TYPES, targetPoints } from '../logic/rank';
-import { BackLink, BuildStamp, confirmDialog, fmt, PageTitle, report, succeeded, toast } from './common';
+import { BackLink, BuildStamp, confirmDialog, fmt, PageTitle, report, Segmented, succeeded, toast } from './common';
+
+const THEMES: { value: ThemeId; label: string }[] = [
+  { value: 'endgame', label: 'Endgame' },
+  { value: 'market', label: 'Market' },
+];
 
 export function SettingsPage() {
   const state = useStore();
@@ -20,7 +26,8 @@ export function SettingsPage() {
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const dirty = JSON.stringify(s) !== JSON.stringify(saved);
   const event = frontier(state);
-  const themes = event?.themes ?? [];
+  const themes = unlockedThemes(state);
+  const titles = earnedTitles(state);
 
   useEffect(() => {
     void navigator.storage?.persisted?.().then(setPersisted, () => setPersisted(null));
@@ -96,37 +103,38 @@ export function SettingsPage() {
           target={s.fitnessTarget ?? { ...FITNESS.defaultTarget }}
           onChange={(fitnessTarget) => setS({ ...s, fitnessTarget })}
         />
-        {themes.includes('endgame') && (
+        {themes.length > 0 && (
           <section class="panel">
             <h3 class="section-label">Theme</h3>
-            <label class="switch">
-              <input
-                type="checkbox"
-                checked={s.theme === 'endgame'}
-                onChange={(e) => setS({ ...s, theme: e.currentTarget.checked ? 'endgame' : 'default' })}
-              />
-              <span>Endgame theme (unlocked by finishing the expedition)</span>
-            </label>
+            <Segmented<ThemeId>
+              value={s.theme ?? 'default'}
+              onChange={(theme) => setS({ ...s, theme })}
+              options={[{ value: 'default', label: 'Default' }, ...THEMES.filter((t) => themes.includes(t.value))]}
+            />
+            <p class="hint">
+              {themes.includes('endgame') && 'Endgame: unlocked by finishing the expedition. '}
+              {themes.includes('market') && 'Market: unlocked by your 20th Salvage Exchange sale.'}
+            </p>
           </section>
         )}
         <button class="btn primary wide" type="submit" disabled={!dirty}>
           Save settings
         </button>
       </form>
-      {(event?.titles ?? []).length > 0 && (
+      {titles.length > 0 && (
         <section class="panel">
           <h3 class="section-label">Title</h3>
           <label>
             <span>Shown under the brand</span>
             <select
-              value={event!.activeTitle ?? ''}
+              value={event?.activeTitle ?? ''}
               onChange={async (e) => {
                 const title = e.currentTarget.value || null;
                 report(await run((st) => setActiveTitle(st, title)));
               }}
             >
               <option value="">No title</option>
-              {event!.titles!.map((t) => (
+              {titles.map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>

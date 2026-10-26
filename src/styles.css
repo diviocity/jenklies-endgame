@@ -2144,6 +2144,81 @@ span.r5 {
   flex-wrap: wrap;
 }
 
+.milestones,
+.money {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.milestone-track {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.milestone-track b {
+  font-size: 18px;
+}
+
+.milestone-list {
+  list-style: none;
+  margin: 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.milestone-list .mono {
+  color: var(--ok);
+}
+
+.money details summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.money details summary::before {
+  content: '▸ ';
+}
+
+.money details[open] summary::before {
+  content: '▾ ';
+}
+
+.money-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.money-table th {
+  font-weight: 400;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: right;
+  padding: 4px 0;
+}
+
+.money-table td {
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  text-align: right;
+}
+
+.money-table td:first-child {
+  text-align: left;
+}
+
+.money .ok {
+  color: var(--ok);
+}
+
 /* The Endgame theme, unlocked by finishing the expedition: midnight blue and gold. */
 :root[data-theme='endgame'] {
   --bg: #080a12;
@@ -2192,6 +2267,53 @@ span.r5 {
 
 :root[data-theme='endgame'] .map-window {
   background: radial-gradient(100% 30% at 50% 0, rgba(255, 201, 58, 0.08), transparent 70%), var(--bg);
+}
+
+/* The Market theme, unlocked by the 20th Salvage Exchange sale: copper and teal. */
+:root[data-theme='market'] {
+  --bg: #090d0d;
+  --bg-2: #0d1414;
+  --panel: #111a1a;
+  --panel-2: #172322;
+  --line: #213130;
+  --line-2: #314847;
+  --muted: #93a8a5;
+  --dim: #5a6f6c;
+  --accent: #e8924f;
+  --accent-2: #f6c08f;
+  --ok: #4fd6c0;
+}
+
+:root[data-theme='market'] .app {
+  background:
+    radial-gradient(110% 55% at 0% -10%, rgba(79, 214, 192, 0.1), transparent 60%),
+    radial-gradient(90% 45% at 100% 105%, rgba(232, 146, 79, 0.1), transparent 70%),
+    linear-gradient(transparent 0 calc(100% - 1px), rgba(79, 214, 192, 0.03) 0) 0 0 / 100% 24px,
+    linear-gradient(90deg, transparent 0 calc(100% - 1px), rgba(79, 214, 192, 0.03) 0) 0 0 / 24px 100%,
+    var(--bg);
+}
+
+:root[data-theme='market'] .panel {
+  border-color: rgba(79, 214, 192, 0.16);
+  box-shadow: inset 0 1px 0 rgba(246, 192, 143, 0.05);
+}
+
+:root[data-theme='market'] .brand-mark {
+  background: linear-gradient(135deg, var(--accent-2), var(--accent) 50%, #9c5427);
+  box-shadow: 0 0 10px rgba(79, 214, 192, 0.35);
+}
+
+:root[data-theme='market'] .topbar,
+:root[data-theme='market'] .tabbar {
+  background: #080c0c;
+}
+
+:root[data-theme='market'] .tabbar a.on svg {
+  filter: drop-shadow(0 0 4px rgba(79, 214, 192, 0.6));
+}
+
+:root[data-theme='market'] .btn.primary {
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
 }
 
 /* ---------------------------------------------------------------- more */
