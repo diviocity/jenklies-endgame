@@ -34,6 +34,7 @@ import {
   type StageResult,
 } from '../logic/depot';
 import type { ActionResult } from '../logic/errors';
+import { isHibernating, isSkippedWeek } from '../logic/hibernation';
 import { addDays, deadlineAt } from '../logic/time';
 import { play } from '../sound';
 import { run, useStore } from '../store';
@@ -197,13 +198,21 @@ function timeUntil(target: Date, now: Date): string {
 }
 
 function MissionPanel({ view, reset, now }: { view: ReturnType<typeof depotView>; reset: Date; now: Date }) {
-  const { mission } = view;
+  const state = useStore();
+  const skipped = isSkippedWeek(state, view.weekKey, now);
+  const { mission } = skipped ? { mission: { ...view.mission, total: 0, listed: 0, completed: false } } : view;
   return (
     <section class={`panel mission ${mission.completed ? 'done' : ''}`}>
       <div class="mission-head">
         <div>
           <span class="label">Weekly mission</span>
-          <b>{mission.total === 0 ? 'No featured lots this week' : `List this week’s featured ${mission.total === 1 ? 'lot' : 'lots'}`}</b>
+          <b>
+            {skipped
+              ? 'No mission this week (hibernation)'
+              : mission.total === 0
+                ? 'No featured lots this week'
+                : `List this week’s featured ${mission.total === 1 ? 'lot' : 'lots'}`}
+          </b>
         </div>
         {mission.total > 0 && (
           <b class={`mono mission-count ${mission.completed ? 'ok' : ''}`}>
@@ -235,7 +244,8 @@ function StageTrack({ item }: { item: SaleItem }) {
 }
 
 function FeaturedLot({ slot, item, now, onOpen }: { slot: FeaturedSlot; item: SaleItem; now: Date; onOpen: (o: Open) => void }) {
-  const age = ageTag(slot, now);
+  const state = useStore();
+  const age = ageTag(state, slot, now);
   return (
     <section class="panel lot">
       <div class="lot-head">
@@ -320,7 +330,12 @@ function StageActions({ item, now, onOpen }: { item: SaleItem; now: Date; onOpen
 
   return (
     <div class="stage-actions">
-      {buttons.length > 0 && <div class="row gap">{buttons}</div>}
+      {buttons.length > 0 &&
+        (isHibernating(state, now) ? (
+          <p class="paused-note">Hibernating: stage changes wait until you wake up, so no rewards are lost.</p>
+        ) : (
+          <div class="row gap">{buttons}</div>
+        ))}
       {undo && (
         <button
           class="mini"
@@ -381,7 +396,7 @@ function ItemSheet({ item, now, onOpen, onClose }: { item: SaleItem; now: Date; 
   return (
     <Sheet title={item.name} onClose={onClose}>
       <div class="form item-sheet">
-        {slot && <p class="mono featured-note">★ Featured lot · {ageTag(slot, now).label}</p>}
+        {slot && <p class="mono featured-note">★ Featured lot · {ageTag(state, slot, now).label}</p>}
         {item.notes && <p class="item-notes">{item.notes}</p>}
         <StageTrack item={item} />
         <ul class="stage-dates mono">

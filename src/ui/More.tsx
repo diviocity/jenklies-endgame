@@ -1,7 +1,9 @@
+import { currentHibernation, isHibernating } from '../logic/hibernation';
 import { getMeta } from '../logic/state';
-import { formatDateTime } from '../logic/time';
+import { dayKeyOf, formatDateTime, formatDayKey } from '../logic/time';
 import { useStore } from '../store';
 import { AffirmationEditor } from './AffirmationEditor';
+import { HibernationPage } from './Hibernation';
 import { History } from './History';
 import { IndulgenceEditor } from './IndulgenceEditor';
 import { BackupPage, SettingsPage } from './Settings';
@@ -15,6 +17,7 @@ const PAGES = {
   affirmations: AffirmationEditor,
   settings: SettingsPage,
   backup: BackupPage,
+  hibernation: HibernationPage,
 };
 
 export function More({ sub, backupDue }: { sub?: string; backupDue: boolean }) {
@@ -23,6 +26,13 @@ export function More({ sub, backupDue }: { sub?: string; backupDue: boolean }) {
   if (Page) return <Page />;
 
   const meta = getMeta(state);
+  const now = new Date();
+  const hibernationDetail = () => {
+    const h = currentHibernation(state, now);
+    if (!h) return 'Pause everything while you’re away';
+    if (isHibernating(state, now)) return 'Hibernating now';
+    return `Scheduled from ${formatDayKey(dayKeyOf(new Date(h.startAt)))}`;
+  };
   const items: { href: string; title: string; detail: string; warn?: boolean }[] = [
     { href: 'history', title: 'History', detail: `${state.pulls.size} pulls · ledger · redemptions` },
     { href: 'template', title: 'Weekly template', detail: `${state.templateTasks.size} tasks` },
@@ -37,6 +47,7 @@ export function More({ sub, backupDue }: { sub?: string; backupDue: boolean }) {
       detail: `${[...state.affirmations.values()].filter((a) => !a.removed).length} in the pool`,
     },
     { href: 'settings', title: 'Settings', detail: 'Deadlines · names · sound' },
+    { href: 'hibernation', title: 'Hibernation', detail: hibernationDetail() },
     {
       href: 'backup',
       title: 'Backup',

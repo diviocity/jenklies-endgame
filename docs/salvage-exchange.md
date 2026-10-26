@@ -32,6 +32,10 @@ Every number lives in `src/config.ts` (`DEPOT`). The rules are in `src/logic/dep
 - **Age tags,** by whole weeks in the slot: **New** (green), **1 week** (yellow), **2 weeks** (orange), **3+ weeks** (red).
 - **Other items** can be listed at any time for their base rewards, and they leave the queue.
 
+## Hibernation
+
+Age tags and the fresh window count only active days. Stage changes wait until you wake up. A week with 4 or more hibernated days has no mission, and open slots never refill while hibernating (they fill when you wake). Weeks with 1–3 hibernated days work normally. See [hibernation.md](hibernation.md).
+
 ## Rewards
 
 Each is paid once per item, ever, and logged in the currency ledger.

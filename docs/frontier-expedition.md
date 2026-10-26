@@ -87,6 +87,10 @@ Checked by unit tests (`tests/rank.test.ts`):
 - **Titles:** a newly earned title is shown straight away, under the brand and on the event screen. You can change or hide it in Settings.
 - **The Endgame theme:** picked in Settings once unlocked (alongside the Salvage Exchange's Market theme). It's midnight blue and gold, with a gold glow across the app, gold-edged panels and a gold brand mark.
 
+## Hibernation
+
+Weeks with 4 or more hibernated days are skipped at the reset (no RP update, no decay, no weekly reward, the weak-week streak unchanged). Weeks with 1–3 are prorated by active days ÷ 7: the decay, the weak threshold, the weekly reward thresholds and the rank panel's target. Logging is off while hibernating, and the map waits until you wake. See [hibernation.md](hibernation.md).
+
 ## Weekly rewards
 
 At each reset, based on the week that ended:

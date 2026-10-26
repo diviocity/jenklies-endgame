@@ -147,4 +147,9 @@ export const DEPOT = {
   soldRepeatSelector: 5 as 4 | 5,
 } as const;
 
-export const SCHEMA_VERSION = 4;
+export const HIBERNATION = {
+  /** A week with at least this many hibernated days is skipped by weekly event resets. */
+  skipWeekDays: 4,
+} as const;
+
+export const SCHEMA_VERSION = 5;

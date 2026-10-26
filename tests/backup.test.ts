@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SCHEMA_VERSION } from '../src/config';
 import { buildBackup, parseBackup, restoredData } from '../src/logic/backup';
 import { ensureDepot, listItem, saveSaleItem } from '../src/logic/depot';
 import { applyChanges, emptyState, seedChanges } from '../src/logic/state';
@@ -41,10 +42,10 @@ describe('backup', () => {
   it('imports a version 3 backup, which has no Salvage Exchange data', () => {
     const file = buildBackup(state, now) as unknown as { schemaVersion: number; data: Record<string, unknown> };
     file.schemaVersion = 3;
-    for (const name of ['saleItems', 'featuredSlots', 'depotWeeks', 'depot']) delete file.data[name];
+    for (const name of ['saleItems', 'featuredSlots', 'depotWeeks', 'depot', 'hibernations']) delete file.data[name];
     const restored = restoredData(parseBackup(JSON.stringify(file)), now);
     expect(restored.saleItems).toEqual([]);
-    expect(restored.meta[0].schemaVersion).toBe(4);
+    expect(restored.meta[0].schemaVersion).toBe(SCHEMA_VERSION);
   });
 
   it('rejects backups from a newer version', () => {

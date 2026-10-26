@@ -161,6 +161,105 @@ h3 {
   font-size: 14px;
 }
 
+.rank-history rect.hib {
+  fill: #2f4462;
+  opacity: 0.8;
+}
+
+.hibernate-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px calc(var(--safe-right) + 16px) 8px calc(var(--safe-left) + 16px);
+  background:
+    repeating-linear-gradient(-45deg, transparent 0 10px, rgba(150, 190, 255, 0.06) 10px 12px),
+    linear-gradient(180deg, #16202e, #111823);
+  border-bottom: 1px solid #2f4462;
+  color: #cfe0ff;
+  position: relative;
+  z-index: 5;
+}
+
+.hibernate-banner b {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.hibernate-banner small {
+  font-size: 11px;
+  color: #93a9cc;
+}
+
+.hibernate-banner .btn {
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  background: #cfe0ff;
+  border-color: #cfe0ff;
+  color: #0b1220;
+}
+
+/* While hibernating the app dims and cools, so the pause is obvious at a glance. */
+:root[data-hibernating] main {
+  filter: saturate(0.4) brightness(0.92);
+}
+
+.hibernating-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+  align-items: center;
+  padding: 28px 18px;
+}
+
+.hibernating-panel .glyph {
+  font-size: 34px;
+  color: #9fc2ff;
+}
+
+.hibernation-now {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hibernation-now b {
+  font-size: 18px;
+}
+
+.hibernation-now.on::before {
+  background: #9fc2ff;
+}
+
+.hibernation-log {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+.hibernation-log li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.paused-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed #2f4462;
+  color: #a9bedf;
+  font-size: 13px;
+}
+
 main {
   flex: 1;
   min-height: 0;

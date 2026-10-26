@@ -119,7 +119,7 @@ describe('featured slots', () => {
       const now = at(day, 9);
       tick(state, now);
       expect(featuredNames(state)).toEqual(['Lamp', 'Desk']);
-      tags.push(ageTag(activeSlots(state)[0], now).label);
+      tags.push(ageTag(state, activeSlots(state)[0], now).label);
     }
     expect(tags).toEqual(['New', '1 week', '2 weeks', '3+ weeks', '3+ weeks']);
   });

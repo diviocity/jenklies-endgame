@@ -16,7 +16,8 @@ export function migrate(state: AppState, now: Date): Change[] {
 
   if (meta.schemaVersion < 2) changes.push(...toVersion2(state, now));
   if (meta.schemaVersion < 3) changes.push(...toVersion3(state, now));
-  // Version 4 adds the Salvage Exchange. Its stores start empty, so there's nothing to convert.
+  // Version 4 adds the Salvage Exchange, and version 5 hibernation. Their stores start empty,
+  // so there's nothing to convert.
 
   changes.push(
     put('meta', {

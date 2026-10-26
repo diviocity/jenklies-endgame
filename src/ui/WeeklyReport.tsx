@@ -1,9 +1,10 @@
 import { unseenDepotWeeks } from '../logic/depot';
 import { describeReward, markReportsSeen, unseenReports, type WeekReport } from '../logic/expedition';
+import { isHibernating, periodLength, periods } from '../logic/hibernation';
 import { addDays, keyToDate } from '../logic/time';
 import type { DepotWeek } from '../types';
 import { run, useStore } from '../store';
-import { Amount, fmt, Portal } from './common';
+import { Amount, fmt, Portal, useNow } from './common';
 
 function weekLabel(weekKey: string): string {
   const fmtDay = (key: string) => keyToDate(key).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -13,14 +14,19 @@ function weekLabel(weekKey: string): string {
 /** Shown on the first open after a weekly reset: how the week went and what it paid. */
 export function WeeklyReport() {
   const state = useStore();
+  const now = useNow();
   const reports = unseenReports(state);
   const depotWeeks = unseenDepotWeeks(state);
-  if (reports.length === 0 && depotWeeks.length === 0) return null;
+  // Held back until you wake up, so it greets you when you're back.
+  if ((reports.length === 0 && depotWeeks.length === 0) || isHibernating(state, now)) return null;
   // After a long break, older weeks are summed up and the latest is shown in full.
   const latest = reports[reports.length - 1];
   const earlier = reports.slice(0, -1);
   const weekId = latest?.week.id ?? depotWeeks[depotWeeks.length - 1].id;
   const close = () => void run((s) => markReportsSeen(s));
+  if (latest?.week.skipped) return <WelcomeBack reports={reports} onClose={close} />;
+  const skipped = earlier.filter((r) => r.week.skipped);
+  const missed = earlier.filter((r) => !r.week.skipped);
 
   return (
     <Portal>
@@ -30,13 +36,56 @@ export function WeeklyReport() {
           <h2>Week of {weekLabel(weekId)}</h2>
           {latest && <WeekSummary report={latest} />}
           <DepotSummary weeks={depotWeeks} weekId={weekId} />
-          {earlier.length > 0 && (
+          {skipped.length > 0 && (
             <p class="hint small">
-              Also closed while you were away: {earlier.length} {earlier.length === 1 ? 'week' : 'weeks'} (
-              {earlier.map((r) => `${fmt(r.week.points)} pts`).join(', ')}).
+              Skipped while hibernating: {skipped.length} {skipped.length === 1 ? 'week' : 'weeks'}. Nothing decayed.
+            </p>
+          )}
+          {missed.length > 0 && (
+            <p class="hint small">
+              Also closed while you were away: {missed.length} {missed.length === 1 ? 'week' : 'weeks'} (
+              {missed.map((r) => `${fmt(r.week.points)} pts`).join(', ')}).
             </p>
           )}
           <button class="btn primary wide" onClick={close}>
+            Continue
+          </button>
+        </div>
+      </div>
+    </Portal>
+  );
+}
+
+/** After hibernating through a week: a short summary instead of the usual report. */
+function WelcomeBack({ reports, onClose }: { reports: WeekReport[]; onClose: () => void }) {
+  const state = useStore();
+  const now = useNow();
+  const last = periods(state).filter((h) => h.endAt && h.endAt <= now.toISOString()).pop();
+  const skipped = reports.filter((r) => r.week.skipped);
+  const rank = reports[reports.length - 1].week.rankAfter;
+  const paid = reports.reduce((s, r) => s + (r.week.rewardSparks ?? 0), 0);
+  return (
+    <Portal>
+      <div class="overlay">
+        <div class="dialog panel weekly-report welcome-back" role="dialog" aria-modal="true" aria-label="Welcome back">
+          <div class="eyebrow">// hibernation ended</div>
+          <h2>Welcome back</h2>
+          {last && (
+            <p class="report-line">
+              You hibernated for {periodLength(last, now)} {periodLength(last, now) === 1 ? 'day' : 'days'}.
+            </p>
+          )}
+          <p class="report-line">
+            {skipped.length} {skipped.length === 1 ? 'week was' : 'weeks were'} skipped: nothing decayed, and Rank {rank} is right where you left
+            it.
+          </p>
+          {paid > 0 && (
+            <p class="report-line">
+              Weekly rewards from the active part of the break: <Amount value={paid} currency="sparks" signed />
+            </p>
+          )}
+          <p class="hint small">Tasks, fitness logging and the Salvage Exchange are back on.</p>
+          <button class="btn primary wide" onClick={onClose}>
             Continue
           </button>
         </div>

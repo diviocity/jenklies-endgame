@@ -2,9 +2,9 @@
 
 A personal iPhone web app that turns my daily schedule into a gacha game. I complete my tasks, earn currency (with a bonus for doing them on time), and spend it on pulls. Rare pulls give **indulgences**: treats I've defined for myself and redeem in my free time. Common pulls give collectible **positive affirmations**. It's for me only: no accounts, no server, no monetization.
 
-**Status:** Phases 1 (the core loop) and 2 (the pull animation) are built. The **Frontier Expedition** fitness event is built; see [docs/frontier-expedition.md](docs/frontier-expedition.md). The **Salvage Exchange** selling event is built; see [docs/salvage-exchange.md](docs/salvage-exchange.md). Streaks, stats and the calendar come later.
+**Status:** Phases 1 (the core loop) and 2 (the pull animation) are built. The **Frontier Expedition** fitness event is built; see [docs/frontier-expedition.md](docs/frontier-expedition.md). The **Salvage Exchange** selling event is built; see [docs/salvage-exchange.md](docs/salvage-exchange.md). **Hibernation**, an app-wide pause for time away, is built; see [docs/hibernation.md](docs/hibernation.md). Streaks, stats and the calendar come later.
 
-- [Using it](#using-it) · [Development](#development) · [Design decisions](#design-decisions) · [Project brief](#project-brief)
+- [Using it](#using-it) · [Development](#development) · [Rules for events](#rules-for-events) · [Design decisions](#design-decisions) · [Project brief](#project-brief)
 
 ## Using it
 
@@ -29,6 +29,15 @@ Stack: Vite, TypeScript and Preact, with IndexedDB through `idb`, and `vite-plug
 - `src/ui/`: the screens.
 
 **Deploying:** `.github/workflows/deploy.yml` tests, builds and publishes `dist/` to GitHub Pages on every push to `main`. One-time setup: repo **Settings → Pages → Source: GitHub Actions**. The site is served from `/jenklies-endgame/`; set `BASE_PATH` when building for a different path. Other hosting options (private repo, Cloudflare Pages, Namecheap cPanel) are written up in [docs/hosting.md](docs/hosting.md).
+
+## Rules for events
+
+Every event (current and future) must respect hibernation, using the shared helpers in `src/logic/hibernation.ts`:
+
+- **Anything that decays, expires or counts time** (ages, streaks, windows, deadlines): count only active days with `activeDaysBetween()`, or check `isHibernatedDay()`.
+- **Weekly resets:** skip the week when `isSkippedWeek()` (4 or more hibernated days, `HIBERNATION.skipWeekDays`). Otherwise prorate thresholds, targets and decay by `activeDayFraction()` (or `hibernatedDaysInWeek()`), or explain in the event's doc why the week works normally.
+- **Anything that earns rewards:** block it while hibernating with `requireAwake()` (or `isHibernating()`), and don't pay automatic rewards (claims, catch-ups) until after waking.
+- **Never take anything away** because of hibernation, and never pay anything for it.
 
 ## Design decisions
 
