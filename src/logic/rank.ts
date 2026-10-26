@@ -54,10 +54,14 @@ export interface WeekStep {
 }
 
 /** The weekly reset: RP = RP × (1 − decay) + this week's points. */
-export function weekStep(rp: number, weakStreak: number, points: number): WeekStep {
-  const weak = points < rp * RANK.weakThreshold;
+/**
+ * One weekly reset. `active` is the share of the week not spent hibernating (1 for a normal
+ * week): it scales the decay and the weak-week threshold.
+ */
+export function weekStep(rp: number, weakStreak: number, points: number, active = 1): WeekStep {
+  const weak = points < rp * RANK.weakThreshold * active;
   const streak = weak ? weakStreak + 1 : 0;
-  const decay = weak ? weakDecay(streak) : RANK.baseDecay;
+  const decay = (weak ? weakDecay(streak) : RANK.baseDecay) * active;
   return { rp: rp * (1 - decay) + points, weak, weakStreak: streak, decay };
 }
 
@@ -65,14 +69,14 @@ export function weekStep(rp: number, weakStreak: number, points: number): WeekSt
  * The fewest points this week that put RP at `rank` or above at the next reset
  * (accounting for the higher decay of a weak week). Infinity can't happen, since RP grows with points.
  */
-export function pointsForRank(rp: number, weakStreak: number, rank: number, max: number): number {
+export function pointsForRank(rp: number, weakStreak: number, rank: number, max: number, active = 1): number {
   const need = rpForRank(rank, max);
-  const threshold = rp * RANK.weakThreshold;
+  const threshold = rp * RANK.weakThreshold * active;
   // As a weak week (fewer points than the threshold), decay is higher.
-  const asWeak = Math.max(0, need - rp * (1 - weakDecay(weakStreak + 1)));
+  const asWeak = Math.max(0, need - rp * (1 - weakDecay(weakStreak + 1) * active));
   if (asWeak < threshold) return Math.ceil(asWeak - 1e-9);
   // Otherwise the week isn't weak, so normal decay applies.
-  return Math.ceil(Math.max(threshold, need - rp * (1 - RANK.baseDecay)) - 1e-9);
+  return Math.ceil(Math.max(threshold, need - rp * (1 - RANK.baseDecay * active)) - 1e-9);
 }
 
 /** Which entries of a week earn points: only the first few activities count. */

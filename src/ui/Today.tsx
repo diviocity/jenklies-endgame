@@ -9,12 +9,14 @@ import {
   today,
   undoTask,
 } from '../logic/actions';
+import { isHibernating } from '../logic/hibernation';
 import { BUCKET_LABELS, deadlineAt, formatDayKey, formatMinutes, formatTime, inputToMinutes } from '../logic/time';
 import { FITNESS } from '../config';
 import { play } from '../sound';
 import { run, useStore } from '../store';
 import type { BucketId, DayBucket, DayRecord, DayTask } from '../types';
 import { Amount, confirmDialog, Empty, fmt, names, report, Sheet, succeeded, toast, useNow, useSaving } from './common';
+import { wake } from './Hibernation';
 
 function timeLeft(ms: number): string {
   const mins = Math.max(0, Math.round(ms / 60_000));
@@ -29,6 +31,21 @@ export function Today() {
   const [adding, setAdding] = useState(false);
   const day = today(state, now);
   if (!day) return <div class="boot">Starting the day…</div>;
+  if (isHibernating(state, now)) {
+    return (
+      <div class="page">
+        <section class="panel hibernating-panel">
+          <span class="glyph" aria-hidden="true">❄</span>
+          <span class="eyebrow">{formatDayKey(day.id)}</span>
+          <h2>Hibernating · no tasks due</h2>
+          <p class="hint">Your progress is paused and safe. Anything you earned earlier today is kept.</p>
+          <button class="btn primary" onClick={wake}>
+            Wake up
+          </button>
+        </section>
+      </div>
+    );
+  }
 
   const done = day.tasks.filter((t) => t.completedAt);
   const { earned, max: possible } = dayTotals(day);

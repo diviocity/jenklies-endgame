@@ -15,9 +15,10 @@ import type {
 import { balances } from './actions';
 import { ActionError, done, type ActionResult } from './errors';
 import { frontier } from './event';
+import { activeDaysBetween, isHibernating, isSkippedWeek, requireAwake } from './hibernation';
 import { newId } from './ids';
 import { getMeta, put } from './state';
-import { addDays, dayKeyOf, deadlineAt, keyToDate, weekKeyOf } from './time';
+import { addDays, dayKeyOf, deadlineAt, weekKeyOf } from './time';
 
 // The Salvage Exchange: a backlog of things to sell, two featured lots at a time.
 
@@ -125,9 +126,9 @@ function fillSlots(state: AppState, at: Date, onlyNeverUsed: boolean): Change[] 
   return changes;
 }
 
-/** The age tag of a featured lot: New, 1 week, 2 weeks, 3+ weeks. */
-export function ageTag(slot: FeaturedSlot, now: Date): { label: string; level: number } {
-  const days = Math.round((keyToDate(dayKeyOf(now)).getTime() - keyToDate(slot.startedDay).getTime()) / 86_400_000);
+/** The age tag of a featured lot: New, 1 week, 2 weeks, 3+ weeks. Hibernated days don't count. */
+export function ageTag(state: AppState, slot: FeaturedSlot, now: Date): { label: string; level: number } {
+  const days = activeDaysBetween(state, slot.startedDay, dayKeyOf(now), now);
   const level = Math.min(DEPOT.ageTags.length - 1, Math.max(0, Math.floor(days / 7)));
   return { label: DEPOT.ageTags[level], level };
 }
@@ -185,11 +186,15 @@ export function ensureDepot(state: AppState, now: Date): Change[] {
     };
     return [put('depot', fresh), ...fillSlots(state, now, true)];
   }
-  // Milestones already reached but not claimed (counts from before milestones existed).
-  const caughtUp = claimMilestones(state, existing, now);
+  const hibernating = isHibernating(state, now);
+  // Milestones already reached but not claimed (counts from before milestones existed). Never while hibernating.
+  const caughtUp = hibernating ? { depot: existing, changes: [], milestones: [] } : claimMilestones(state, existing, now);
   if (existing.currentWeek >= thisWeek) {
-    const fills = fillSlots(state, now, true);
-    return caughtUp.milestones.length ? [...fills, ...caughtUp.changes, put('depot', caughtUp.depot)] : fills;
+    // Back from hibernation: fill the slots a reset left open.
+    const wake = existing.refillOnWake && !hibernating;
+    const fills = fillSlots(state, now, !wake);
+    if (!caughtUp.milestones.length && !wake) return fills;
+    return [...fills, ...caughtUp.changes, put('depot', { ...caughtUp.depot, refillOnWake: wake ? false : caughtUp.depot.refillOnWake })];
   }
 
   // Work on a copy of the slots so each reset sees the fills of the one before.
@@ -198,8 +203,11 @@ export function ensureDepot(state: AppState, now: Date): Change[] {
   const changes: Change[] = [];
   const at = now.toISOString();
   let week = existing.currentWeek;
+  let refillOnWake = existing.refillOnWake ?? false;
   while (week < thisWeek) {
-    const mission = missionStatus(slots.values(), week);
+    // A mostly hibernated week has no mission.
+    const skipped = isSkippedWeek(state, week, now);
+    const mission = skipped ? { lots: [], listed: 0, total: 0, completed: false } : missionStatus(slots.values(), week);
     const reward = mission.completed ? DEPOT.mission : { sparks: 0, shards: 0 };
     const record: DepotWeek = {
       id: week,
@@ -212,17 +220,28 @@ export function ensureDepot(state: AppState, now: Date): Change[] {
       closedAt: at,
       // A week without featured lots has nothing to report.
       seen: mission.total === 0,
+      ...(skipped ? { skipped: true } : {}),
     };
     changes.push(put('depotWeeks', record));
     const note = `Salvage Exchange: weekly mission (week of ${week})`;
     if (reward.sparks) changes.push(put('ledger', ledger({ at, currency: 'sparks', amount: reward.sparks, reason: 'depot_mission', note })));
     if (reward.shards) changes.push(put('ledger', ledger({ at, currency: 'shards', amount: reward.shards, reason: 'depot_mission', note })));
     week = addDays(week, 7);
+    // Slots never refill while hibernating; they fill when you wake up instead.
+    if (isHibernating(state, weekStart(week))) {
+      refillOnWake = true;
+      continue;
+    }
     const fills = fillSlots(view, weekStart(week), false);
     for (const c of fills) if (c.store === 'featuredSlots' && c.op === 'put') slots.set(c.value.id, c.value);
     changes.push(...fills);
+    refillOnWake = false;
   }
-  changes.push(...caughtUp.changes, put('depot', { ...caughtUp.depot, currentWeek: thisWeek }));
+  if (refillOnWake && !hibernating) {
+    changes.push(...fillSlots(view, now, false));
+    refillOnWake = false;
+  }
+  changes.push(...caughtUp.changes, put('depot', { ...caughtUp.depot, currentWeek: thisWeek, refillOnWake }));
   return changes;
 }
 
@@ -347,8 +366,9 @@ interface Reward {
   parts: string[];
 }
 
-function isFresh(item: SaleItem, listedDay: string): boolean {
-  return item.photographedDay !== null && listedDay <= addDays(item.photographedDay, DEPOT.freshDays);
+/** Listed within the fresh window of the photo, counting active days only. */
+function isFresh(state: AppState, item: SaleItem, listedDay: string, now: Date): boolean {
+  return item.photographedDay !== null && activeDaysBetween(state, item.photographedDay, listedDay, now) <= DEPOT.freshDays;
 }
 
 /** What listing an item now would pay (photo reward included when that gets marked too). */
@@ -364,7 +384,7 @@ export function listingReward(state: AppState, item: SaleItem, now: Date): Rewar
   if (!item.paid.listed) add(DEPOT.listed, 'listed');
   if (!item.paid.featured && !item.firstListedAt && activeSlotOf(state, item.id)) add(DEPOT.featuredBonus, 'featured');
   const photoDay = item.photographedDay ?? day;
-  if (!item.paid.fresh && !item.firstListedAt && isFresh({ ...item, photographedDay: photoDay }, day)) add(DEPOT.freshBonus, 'fresh');
+  if (!item.paid.fresh && !item.firstListedAt && isFresh(state, { ...item, photographedDay: photoDay }, day, now)) add(DEPOT.freshBonus, 'fresh');
   return reward;
 }
 
@@ -468,8 +488,14 @@ export function saveSaleItem(state: AppState, input: SaleItemInput, now: Date): 
   return done(changes, { id: item.id });
 }
 
+/** Stage changes wait until you wake up, so their rewards are never lost or earned while away. */
+function requireItemAwake(state: AppState, id: string, now: Date): SaleItem {
+  requireAwake(state, now, 'move items along');
+  return requireItem(state, id);
+}
+
 export function markPhotographed(state: AppState, id: string, now: Date): ActionResult<StageResult> {
-  const item = requireItem(state, id);
+  const item = requireItemAwake(state, id, now);
   if (item.photographedAt) throw new ActionError('Already photographed.');
   const updated = { ...item, photographedAt: now.toISOString(), photographedDay: dayKeyOf(now), paid: { ...item.paid, photographed: true } };
   const payments = item.paid.photographed ? [] : [{ reward: DEPOT.photographed, note: 'photographed' }];
@@ -482,7 +508,7 @@ function cleanPlatforms(list: string[]): string[] {
 
 /** Puts an item on the market (marking it photographed too if it wasn't). Rewards are paid once per item, ever. */
 export function listItem(state: AppState, id: string, platformList: string[], now: Date): ActionResult<StageResult> {
-  const item = requireItem(state, id);
+  const item = requireItemAwake(state, id, now);
   if (item.soldAt) throw new ActionError('That item is already sold.');
   if (item.listedAt) throw new ActionError('That item is already on the market.');
   const chosen = cleanPlatforms(platformList);
@@ -532,7 +558,7 @@ function listChanges(
 
 /** Changes which platforms a listed item is on. Pays nothing. */
 export function setPlatforms(state: AppState, id: string, platformList: string[], now: Date): ActionResult<StageResult> {
-  const item = requireItem(state, id);
+  const item = requireItemAwake(state, id, now);
   if (!item.listedAt) throw new ActionError('That item is not on the market.');
   const chosen = cleanPlatforms(platformList);
   if (chosen.length === 0) throw new ActionError('Keep at least one platform, or take the item down.');
@@ -541,7 +567,7 @@ export function setPlatforms(state: AppState, id: string, platformList: string[]
 
 /** Takes an item off the market without selling it. Relisting later pays nothing. */
 export function takeDown(state: AppState, id: string, now: Date): ActionResult<StageResult> {
-  const item = requireItem(state, id);
+  const item = requireItemAwake(state, id, now);
   if (!item.listedAt) throw new ActionError('That item is not on the market.');
   return step(item, { ...item, listedAt: null, platforms: [], takenDownAt: now.toISOString() }, 'takenDown', now, []);
 }
@@ -563,7 +589,7 @@ export function parseDollars(text: string): number | null {
 
 /** Records a sale (listing the item first if it wasn't, which pays the listing rewards). */
 export function markSold(state: AppState, id: string, input: SaleInput, now: Date): ActionResult<StageResult> {
-  const item = requireItem(state, id);
+  const item = requireItemAwake(state, id, now);
   if (item.soldAt) throw new ActionError('That item is already sold.');
   const price = parseDollars(input.price);
   if (price === null) throw new ActionError('Enter the sale price.');
@@ -581,14 +607,14 @@ export function markSold(state: AppState, id: string, input: SaleInput, now: Dat
 
 /** The buyer backed out before the hand-off: back on the market, as it was. */
 export function saleFellThrough(state: AppState, id: string, now: Date): ActionResult<StageResult> {
-  const item = requireItem(state, id);
+  const item = requireItemAwake(state, id, now);
   if (!item.soldAt || item.handedOffAt) throw new ActionError('Only a sold item that hasn’t been handed off can go back on the market.');
   const platformsNow = item.platforms.length ? item.platforms : item.sale ? [item.sale.platform] : [];
   return step(item, { ...item, soldAt: null, sale: null, listedAt: item.listedAt ?? now.toISOString(), platforms: platformsNow }, 'fellThrough', now, []);
 }
 
 export function markHandedOff(state: AppState, id: string, now: Date): ActionResult<StageResult> {
-  const item = requireItem(state, id);
+  const item = requireItemAwake(state, id, now);
   if (!item.soldAt) throw new ActionError('Mark it sold first, with the price.');
   if (item.handedOffAt) throw new ActionError('Already handed off.');
   const first = !item.paid.handedOff;

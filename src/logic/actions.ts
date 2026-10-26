@@ -16,6 +16,7 @@ import type {
   TemplateTask,
 } from '../types';
 import { ActionError, done, type ActionResult } from './errors';
+import { requireAwake } from './hibernation';
 import { taskFitnessEntries, taskFitnessEntry, wouldCount } from './event';
 import { pickIndex, rollRarity, type Rng } from './gacha';
 import { newId } from './ids';
@@ -205,6 +206,7 @@ export interface CompleteResult {
 }
 
 export function completeTask(state: AppState, taskId: string, now: Date): ActionResult<CompleteResult> {
+  requireAwake(state, now, 'check off tasks');
   const day = requireToday(state, now);
   const task = findTask(day, taskId);
   if (task.completedAt) throw new ActionError('Already done.');

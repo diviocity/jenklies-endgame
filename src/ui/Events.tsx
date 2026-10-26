@@ -6,6 +6,7 @@ import { addDays, dayKeyOf, deadlineAt, formatTime, keyToDate } from '../logic/t
 import { play } from '../sound';
 import { run, useStore } from '../store';
 import type { FitnessType } from '../types';
+import { isHibernating } from '../logic/hibernation';
 import { ExpeditionMap } from './ExpeditionMap';
 import { Salvage, SalvageCard } from './Salvage';
 import { Empty, fmt, PageTitle, report, Segmented, Sheet, toast, useNow } from './common';
@@ -68,9 +69,13 @@ function Frontier() {
       <PageTitle eyebrow="// permanent event" title="Frontier Expedition" />
       <Honors />
       <RankPanel status={status} now={now} />
-      <button class="btn primary wide" onClick={() => setLogging(true)}>
-        + Log activity
-      </button>
+      {isHibernating(state, now) ? (
+        <p class="paused-note">Hibernating: logging is paused until you wake up.</p>
+      ) : (
+        <button class="btn primary wide" onClick={() => setLogging(true)}>
+          + Log activity
+        </button>
+      )}
       <ExpeditionMap />
       <WeekLog weekKey={status.weekKey} now={now} />
       {logging && <LogSheet onClose={() => setLogging(false)} weekKey={status.weekKey} />}
@@ -119,8 +124,10 @@ function Honors() {
 function RankPanel({ status, now }: { status: RankStatus; now: Date }) {
   const reset = deadlineAt(addDays(status.weekKey, 7), 4 * 60);
   const pct = Math.round(status.progress * 100);
-  const atMax = status.toNext === null;
-  const meterLabel = !status.holding
+  const atMax = status.toNext === null && !status.skipped;
+  const meterLabel = status.skipped
+    ? 'Skipped this week (hibernation)'
+    : !status.holding
     ? `${pct}% of the way to holding Rank ${status.rank}`
     : atMax
       ? 'Rank 20 held'
@@ -154,6 +161,18 @@ function RankPanel({ status, now }: { status: RankStatus; now: Date }) {
         <i style={{ width: `${pct}%` }} />
       </div>
       <small class="mono muted rank-caption">{meterLabel}</small>
+      {status.skipped ? (
+        <p class="paused-note">
+          {status.hibernatedDays} hibernated days this week, so it’s skipped at the reset: no decay, no weekly reward, rank held.
+        </p>
+      ) : (
+        status.hibernatedDays > 0 && (
+          <p class="hint small">
+            {status.hibernatedDays} hibernated {status.hibernatedDays === 1 ? 'day' : 'days'} this week: the target, decay and thresholds
+            are prorated to {7 - status.hibernatedDays}/7.
+          </p>
+        )
+      )}
       <div class="rank-stats">
         <div>
           <span class="label">This week</span>
@@ -169,7 +188,7 @@ function RankPanel({ status, now }: { status: RankStatus; now: Date }) {
         <div>
           <span class="label">Next rank</span>
           <b class={`mono ${status.toNext === 0 ? 'ok' : ''}`}>
-            {atMax ? 'MAX' : status.toNext === 0 ? '✓ Reached' : `+${fmt(status.toNext!)}`}
+            {status.skipped ? '—' : atMax ? 'MAX' : status.toNext === 0 ? '✓ Reached' : `+${fmt(status.toNext!)}`}
           </b>
         </div>
       </div>
@@ -180,8 +199,8 @@ function RankPanel({ status, now }: { status: RankStatus; now: Date }) {
 
 /** The last few weeks' ranks as bars, ending with where this week stands. */
 function RankHistory({ status }: { status: RankStatus }) {
-  const past = status.history.slice(-11).map((w) => ({ rank: w.rankAfter, label: w.id, now: false }));
-  const bars = [...past, { rank: status.projectedRank, label: 'this week', now: true }];
+  const past = status.history.slice(-11).map((w) => ({ rank: w.rankAfter, label: w.id, now: false, skipped: !!w.skipped }));
+  const bars = [...past, { rank: status.projectedRank, label: 'this week', now: true, skipped: status.skipped }];
   if (past.length === 0) {
     return <p class="hint small">Your rank history starts after the first weekly reset (Mondays at 4 AM).</p>;
   }
@@ -195,7 +214,7 @@ function RankHistory({ status }: { status: RankStatus }) {
           return (
             <rect
               key={b.label}
-              class={b.now ? 'now' : ''}
+              class={`${b.now ? 'now' : ''} ${b.skipped ? 'hib' : ''}`}
               x={i * w + w * 0.15}
               y={32 - h}
               width={w * 0.7}

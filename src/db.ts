@@ -5,7 +5,7 @@ import type { BackupData } from './logic/backup';
 import { emptyState } from './logic/state';
 
 const DB_NAME = 'jenklies-endgame';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 

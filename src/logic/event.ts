@@ -23,6 +23,7 @@ import {
   weekPoints,
   weekStep,
 } from './rank';
+import { activeDayFraction, hibernatedDaysInWeek, isSkippedWeek, requireAwake } from './hibernation';
 import { getMeta, put } from './state';
 import { addDays, dayKeyOf, weekKeyOf } from './time';
 
@@ -72,7 +73,36 @@ export function ensureEvent(state: AppState, now: Date): Change[] {
   const event = { ...existing };
   while (event.currentWeek < thisWeek) {
     const points = weekPoints(entriesForWeek(state, event.currentWeek));
-    const step = weekStep(event.rp, event.weakStreak, points);
+    const hibernatedDays = hibernatedDaysInWeek(state, event.currentWeek, now);
+    if (isSkippedWeek(state, event.currentWeek, now)) {
+      // Mostly hibernated: skipped entirely. Nothing decays and nothing is paid.
+      changes.push(
+        put('eventWeeks', {
+          id: event.currentWeek,
+          points,
+          targetPoints: target,
+          rpMax: max,
+          rpBefore: event.rp,
+          rpAfter: event.rp,
+          decay: 0,
+          weak: false,
+          weakStreak: event.weakStreak,
+          rankBefore: event.rank,
+          rankAfter: event.rank,
+          closedAt: now.toISOString(),
+          seen: false,
+          hibernatedDays,
+          skipped: true,
+          rewardSparks: 0,
+          rewardShards: 0,
+          mapAtClose: event.mapProgress ?? 0,
+        }),
+      );
+      event.currentWeek = addDays(event.currentWeek, 7);
+      continue;
+    }
+    // A few hibernated days prorate the week: decay, the weak threshold and reward thresholds.
+    const step = weekStep(event.rp, event.weakStreak, points, activeDayFraction(state, event.currentWeek, now));
     const rankAfter = rankOf(step.rp, max);
     const record: EventWeek = {
       id: event.currentWeek,
@@ -88,6 +118,7 @@ export function ensureEvent(state: AppState, now: Date): Change[] {
       rankAfter,
       closedAt: now.toISOString(),
       seen: false,
+      hibernatedDays,
     };
     record.mapAtClose = event.mapProgress ?? 0;
     changes.push(...payWeek(record, now));
@@ -117,9 +148,16 @@ function ledger(entry: Omit<LedgerEntry, 'id'>): Change {
   return put('ledger', { id: newId(), ...entry });
 }
 
-/** Pays a closed week's reward into the ledger and records it on the week. */
+/** The share of a closed week that was active (hibernated days prorate its reward thresholds). */
+export function weekActiveShare(week: EventWeek): number {
+  return (7 - (week.hibernatedDays ?? 0)) / 7;
+}
+
+/** Pays a closed week's reward into the ledger and records it on the week. Skipped weeks pay nothing. */
 export function payWeek(week: EventWeek, now: Date): Change[] {
-  const { sparks, shards } = weeklyReward(week.points, week.targetPoints, week.rankAfter);
+  const { sparks, shards } = week.skipped
+    ? { sparks: 0, shards: 0 }
+    : weeklyReward(week.points, week.targetPoints * weekActiveShare(week), week.rankAfter);
   const at = now.toISOString();
   const note = `Expedition: week of ${week.id}`;
   const changes: Change[] = [put('eventWeeks', { ...week, rewardSparks: sparks, rewardShards: shards })];
@@ -147,18 +185,45 @@ export interface RankStatus {
   progress: number;
   weekKey: string;
   history: EventWeek[];
+  /** Hibernated days this week (known so far, plus any scheduled). */
+  hibernatedDays: number;
+  /** This week will be skipped at the reset (too many hibernated days). */
+  skipped: boolean;
 }
 
 export function rankStatus(state: AppState, now: Date): RankStatus | null {
   const event = frontier(state);
   if (!event) return null;
-  const target = targetPoints(fitnessTarget(state));
-  const max = rpMax(target);
+  const fullTarget = targetPoints(fitnessTarget(state));
+  const max = rpMax(fullTarget);
   const weekKey = weekKeyOf(dayKeyOf(now));
   const points = weekPoints(entriesForWeek(state, weekKey));
+  const hibernatedDays = hibernatedDaysInWeek(state, weekKey, now);
+  const skipped = isSkippedWeek(state, weekKey, now);
+  // Hibernated days prorate this week's target, decay and thresholds.
+  const active = activeDayFraction(state, weekKey, now);
+  const target = Math.round(fullTarget * active);
   // Rank shown is from the last reset; it rescales at once if the target changes.
   const rank = rankOf(event.rp, max);
-  const projected = weekStep(event.rp, event.weakStreak, points).rp;
+  if (skipped) {
+    return {
+      rank,
+      rp: event.rp,
+      rpMax: max,
+      target,
+      weekPoints: points,
+      projectedRank: rank,
+      toHold: 0,
+      toNext: null,
+      holding: true,
+      progress: 1,
+      weekKey,
+      history: eventHistory(state),
+      hibernatedDays,
+      skipped,
+    };
+  }
+  const projected = weekStep(event.rp, event.weakStreak, points, active).rp;
   const lower = rpForRank(rank, max);
   const upper = rpForRank(rank + 1, max);
   return {
@@ -168,8 +233,8 @@ export function rankStatus(state: AppState, now: Date): RankStatus | null {
     target,
     weekPoints: points,
     projectedRank: rankOf(projected, max),
-    toHold: Math.max(0, pointsForRank(event.rp, event.weakStreak, rank, max) - points),
-    toNext: rank >= 20 ? null : Math.max(0, pointsForRank(event.rp, event.weakStreak, rank + 1, max) - points),
+    toHold: Math.max(0, pointsForRank(event.rp, event.weakStreak, rank, max, active) - points),
+    toNext: rank >= 20 ? null : Math.max(0, pointsForRank(event.rp, event.weakStreak, rank + 1, max, active) - points),
     holding: projected >= lower - 1e-9,
     progress:
       projected < lower - 1e-9
@@ -179,6 +244,8 @@ export function rankStatus(state: AppState, now: Date): RankStatus | null {
           : Math.min(1, (projected - lower) / (upper - lower)),
     weekKey,
     history: eventHistory(state),
+    hibernatedDays,
+    skipped,
   };
 }
 
@@ -216,6 +283,7 @@ export function logActivity(
   now: Date,
 ): ActionResult<{ points: number }> {
   if (!(input.type in FITNESS.points)) throw new ActionError('Pick an activity type.');
+  requireAwake(state, now, 'log activity');
   const dayKey = dayKeyOf(now);
   const entry = fitnessEntry({
     at: now.toISOString(),

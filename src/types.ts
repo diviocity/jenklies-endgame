@@ -249,6 +249,10 @@ export interface EventWeek {
   closedAt: string;
   /** Whether the weekly report for this week has been shown. */
   seen: boolean;
+  /** Days of the week spent hibernating (missing on weeks closed before hibernation existed). */
+  hibernatedDays?: number;
+  /** Skipped for hibernation: RP, rank and the weak-week streak were left as they were. */
+  skipped?: boolean;
   /** Weekly rewards paid at the reset (missing on weeks closed before weekly rewards existed). */
   rewardSparks?: number;
   rewardShards?: number;
@@ -360,6 +364,8 @@ export interface DepotWeek {
   rewardShards: number;
   closedAt: string;
   seen: boolean;
+  /** No mission: the week had too many hibernated days. */
+  skipped?: boolean;
 }
 
 /** The Salvage Exchange's running state. */
@@ -378,6 +384,20 @@ export interface DepotState {
   /** Titles and themes earned here. The title shown is kept on the Frontier Expedition's state. */
   titles?: string[];
   themes?: string[];
+  /** A reset passed while hibernating, so open slots fill when you wake up. */
+  refillOnWake?: boolean;
+}
+
+/** A hibernation period: an app-wide pause. Ended periods are read-only. */
+export interface Hibernation {
+  id: string;
+  /** When it starts: the moment it was switched on, or 4 AM on the scheduled start day. */
+  startAt: string;
+  /** When it ends: when woken up, or 4 AM after the last scheduled day. Null while open-ended. */
+  endAt: string | null;
+  /** The scheduled last day away, if one was set. */
+  endDay: string | null;
+  createdAt: string;
 }
 
 export interface StoreRecords {
@@ -398,6 +418,7 @@ export interface StoreRecords {
   featuredSlots: FeaturedSlot;
   depotWeeks: DepotWeek;
   depot: DepotState;
+  hibernations: Hibernation;
 }
 
 export type StoreName = keyof StoreRecords;
@@ -420,6 +441,7 @@ export const STORE_NAMES: StoreName[] = [
   'featuredSlots',
   'depotWeeks',
   'depot',
+  'hibernations',
 ];
 
 /** All app data, held in memory as id → record maps. */

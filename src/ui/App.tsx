@@ -2,14 +2,16 @@ import { useEffect, useState } from 'preact/hooks';
 import { BACKUP } from '../config';
 import { balances } from '../logic/actions';
 import { getMeta } from '../logic/state';
-import { daysBetween } from '../logic/time';
+import { dayKeyOf, daysBetween, formatDayKey } from '../logic/time';
 import { frontier } from '../logic/event';
 import { describeReward, REGIONS } from '../logic/expedition';
+import { activeHibernation } from '../logic/hibernation';
 import { play } from '../sound';
 import { isReady, onExpeditionClaims, useStore } from '../store';
 import { Bag } from './Bag';
-import { Amount, toast, UiHost } from './common';
+import { Amount, toast, UiHost, useNow } from './common';
 import { Events } from './Events';
+import { wake } from './Hibernation';
 import { More } from './More';
 import { Pull } from './Pull';
 import { Today } from './Today';
@@ -112,10 +114,15 @@ export function App() {
   const state = useStore();
   const route = useRoute();
   useExpeditionToasts();
+  const now = useNow();
   const theme = state.meta.get('meta')?.settings.theme ?? 'default';
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+  const hibernation = isReady() ? activeHibernation(state, now) : null;
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-hibernating', !!hibernation);
+  }, [!!hibernation]);
   if (!isReady()) return <div class="boot">INITIALIZING…</div>;
 
   // The Collection tab moved into the Bag; old links land there.
@@ -148,6 +155,17 @@ export function App() {
           <Amount value={shards} currency="shards" />
         </div>
       </header>
+      {hibernation && (
+        <div class="hibernate-banner" role="status">
+          <span>
+            <b>Hibernating</b>
+            <small class="mono">since {formatDayKey(dayKeyOf(new Date(hibernation.startAt)))} · progress is paused</small>
+          </span>
+          <button class="btn" onClick={wake}>
+            Wake up
+          </button>
+        </div>
+      )}
       <main>
         {tab === 'today' && <Today />}
         {tab === 'pull' && <Pull />}

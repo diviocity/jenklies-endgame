@@ -2,6 +2,7 @@ import { EXPEDITION } from '../config';
 import type { AppState, Change, EventWeek, ExpeditionRecord, FitnessEntry, FrontierState, LedgerEntry } from '../types';
 import { ActionError, done, type ActionResult } from './errors';
 import { frontier, fitnessTarget } from './event';
+import { isHibernating } from './hibernation';
 import { earnedTitles } from './honors';
 import { newId } from './ids';
 import { countedEntryIds, rankOf, rpMax, targetPoints } from './rank';
@@ -166,7 +167,8 @@ function ledger(entry: Omit<LedgerEntry, 'id'>): Change {
  */
 export function settleExpedition(state: AppState, now: Date): { changes: Change[]; claimed: MapNode[] } {
   const event = frontier(state);
-  if (!event) return { changes: [], claimed: [] };
+  // Nothing is earned while hibernating; the map catches up after waking.
+  if (!event || isHibernating(state, now)) return { changes: [], claimed: [] };
   const from = event.mapProgress ?? 0;
   const { points, sessions } = lifetimePoints(state);
   const to = Math.min(points, gateCap(gateRank(state, event)), MAP_LENGTH);

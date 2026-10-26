@@ -144,6 +144,13 @@ export function SettingsPage() {
         </section>
       )}
       <section class="panel">
+        <h3 class="section-label">Hibernation</h3>
+        <p class="hint">Pause everything while you’re away. Start or schedule it, and see the log of every period.</p>
+        <a class="btn ghost wide" href="#/more/hibernation">
+          Hibernation and log
+        </a>
+      </section>
+      <section class="panel">
         <h3 class="section-label">Storage</h3>
         <p class="small">
           {persisted === true && 'Persistent: the browser has agreed to keep your data.'}
