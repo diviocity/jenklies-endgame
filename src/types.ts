@@ -105,7 +105,9 @@ export type LedgerReason =
   | 'pull_shards'
   | 'shop'
   | 'event_node'
-  | 'event_weekly';
+  | 'event_weekly'
+  | 'depot_item'
+  | 'depot_mission';
 
 export interface LedgerEntry {
   id: string;
@@ -120,6 +122,8 @@ export interface LedgerEntry {
   bucketId?: BucketId;
   pullId?: string;
   purchaseId?: string;
+  /** The Salvage Exchange item it was for. */
+  itemId?: string;
 }
 
 export interface PullRecord {
@@ -260,6 +264,110 @@ export interface Selector {
   name: string | null;
 }
 
+// ---------------------------------------------------------------- Salvage Exchange
+
+/** What happened to an item, in the order it can happen. */
+export type SaleStage = 'cataloged' | 'photographed' | 'listed' | 'sold' | 'handedOff';
+
+/** Money in whole cents (US dollars). Information only; never used in reward math. */
+export interface SaleRecord {
+  price: number;
+  platform: string;
+  fees: number;
+}
+
+/** The rewards an item has paid. Each is paid once per item, ever. */
+export interface SaleRewardsPaid {
+  photographed?: boolean;
+  listed?: boolean;
+  featured?: boolean;
+  fresh?: boolean;
+  handedOff?: boolean;
+}
+
+export type SaleStepKind = 'photographed' | 'listed' | 'platforms' | 'takenDown' | 'sold' | 'fellThrough' | 'handedOff';
+
+/** One stage change, kept so it can be undone the same day. */
+export interface SaleStep {
+  kind: SaleStepKind;
+  at: string;
+  dayKey: string;
+  /** The item as it was before this step. */
+  before: Omit<SaleItem, 'log'>;
+  /** Ledger entries this step paid (reversed by undo). */
+  ledgerIds: string[];
+  /** The featured slot stint this step ended (reopened by undo). */
+  endedSlotId?: string;
+}
+
+/** Something to sell. */
+export interface SaleItem {
+  id: string;
+  name: string;
+  notes: string;
+  category: string;
+  createdAt: string;
+  photographedAt: string | null;
+  /** Day key of the photo (the fresh-listing window counts from here). */
+  photographedDay: string | null;
+  /** When it first went on the market; never cleared, so relisting pays nothing. */
+  firstListedAt: string | null;
+  /** When the current listing went up (null when it's not on the market). */
+  listedAt: string | null;
+  /** Platforms it's listed on now. */
+  platforms: string[];
+  /** When it was last taken down without selling. */
+  takenDownAt: string | null;
+  soldAt: string | null;
+  sale: SaleRecord | null;
+  handedOffAt: string | null;
+  paid: SaleRewardsPaid;
+  /** Recent stage changes, newest last. */
+  log: SaleStep[];
+}
+
+/** One stint of an item in a featured slot. */
+export interface FeaturedSlot {
+  id: string;
+  /** 0-based slot. */
+  slot: number;
+  itemId: string;
+  /** The item's name when it was featured (kept if the item is deleted). */
+  name: string;
+  startedAt: string;
+  startedDay: string;
+  endedAt: string | null;
+  endReason: 'listed' | 'deleted' | null;
+}
+
+/** A closed week of the Salvage Exchange: its weekly mission. */
+export interface DepotWeek {
+  /** The week's Monday day key. */
+  id: string;
+  /** Featured lots that counted for the mission. */
+  lots: string[];
+  listed: number;
+  total: number;
+  completed: boolean;
+  rewardSparks: number;
+  rewardShards: number;
+  closedAt: string;
+  seen: boolean;
+}
+
+/** The Salvage Exchange's running state. */
+export interface DepotState {
+  id: 'depot';
+  startedWeek: string;
+  /** The week in progress; every earlier week has been closed. */
+  currentWeek: string;
+  /** Platforms you've added on top of the defaults. */
+  customPlatforms: string[];
+  /** Lifetime counts (deleting an item never lowers them). */
+  listedCount: number;
+  handedOffCount: number;
+}
+
 export interface StoreRecords {
   meta: Meta;
   templateTasks: TemplateTask;
@@ -274,6 +382,10 @@ export interface StoreRecords {
   events: FrontierState;
   eventWeeks: EventWeek;
   selectors: Selector;
+  saleItems: SaleItem;
+  featuredSlots: FeaturedSlot;
+  depotWeeks: DepotWeek;
+  depot: DepotState;
 }
 
 export type StoreName = keyof StoreRecords;
@@ -292,6 +404,10 @@ export const STORE_NAMES: StoreName[] = [
   'events',
   'eventWeeks',
   'selectors',
+  'saleItems',
+  'featuredSlots',
+  'depotWeeks',
+  'depot',
 ];
 
 /** All app data, held in memory as id → record maps. */

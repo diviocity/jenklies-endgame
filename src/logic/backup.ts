@@ -5,7 +5,16 @@ import { migrate } from './migrate';
 import { applyChanges, emptyState } from './state';
 
 /** Stores that older backups don't have, by the data version that added them. */
-const ADDED_IN: Partial<Record<StoreName, number>> = { fitness: 2, events: 2, eventWeeks: 2, selectors: 2 };
+const ADDED_IN: Partial<Record<StoreName, number>> = {
+  fitness: 2,
+  events: 2,
+  eventWeeks: 2,
+  selectors: 2,
+  saleItems: 4,
+  featuredSlots: 4,
+  depotWeeks: 4,
+  depot: 4,
+};
 
 export const APP_ID = 'jenklies-endgame';
 
@@ -90,5 +99,6 @@ export function summarizeBackup(file: BackupFile): string {
     count(d.indulgences.length, 'indulgence'),
     count(d.affirmations.length, 'affirmation'),
     count(d.fitness.length, 'fitness entry', 'fitness entries'),
+    count(d.saleItems.length, 'item for sale', 'items for sale'),
   ].join(' · ');
 }

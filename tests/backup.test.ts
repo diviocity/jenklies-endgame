@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildBackup, parseBackup } from '../src/logic/backup';
+import { buildBackup, parseBackup, restoredData } from '../src/logic/backup';
+import { ensureDepot, listItem, saveSaleItem } from '../src/logic/depot';
 import { applyChanges, emptyState, seedChanges } from '../src/logic/state';
 import { ensureDay } from '../src/logic/actions';
 import { STORE_NAMES } from '../src/types';
@@ -22,6 +23,28 @@ describe('backup', () => {
     const file = buildBackup(state, now) as unknown as { data: Record<string, unknown> };
     delete file.data.pulls;
     expect(() => parseBackup(JSON.stringify(file))).toThrow(/missing "pulls"/);
+  });
+
+  it('keeps Salvage Exchange items, slots and platforms through a round trip', () => {
+    const copy = emptyState();
+    applyChanges(copy, seedChanges(now.toISOString()));
+    applyChanges(copy, ensureDepot(copy, now));
+    const { changes, result } = saveSaleItem(copy, { name: 'Lamp', notes: 'brass', category: 'Home' }, now);
+    applyChanges(copy, changes);
+    applyChanges(copy, listItem(copy, result.id, ['eBay', 'OfferUp'], now).changes);
+    const restored = restoredData(parseBackup(JSON.stringify(buildBackup(copy, now))), now);
+    expect(restored.saleItems[0]).toMatchObject({ name: 'Lamp', platforms: ['eBay', 'OfferUp'], paid: { listed: true } });
+    expect(restored.featuredSlots[0]).toMatchObject({ endReason: 'listed' });
+    expect(restored.depot[0]).toMatchObject({ listedCount: 1 });
+  });
+
+  it('imports a version 3 backup, which has no Salvage Exchange data', () => {
+    const file = buildBackup(state, now) as unknown as { schemaVersion: number; data: Record<string, unknown> };
+    file.schemaVersion = 3;
+    for (const name of ['saleItems', 'featuredSlots', 'depotWeeks', 'depot']) delete file.data[name];
+    const restored = restoredData(parseBackup(JSON.stringify(file)), now);
+    expect(restored.saleItems).toEqual([]);
+    expect(restored.meta[0].schemaVersion).toBe(4);
   });
 
   it('rejects backups from a newer version', () => {

@@ -1,5 +1,7 @@
+import { unseenDepotWeeks } from '../logic/depot';
 import { describeReward, markReportsSeen, unseenReports, type WeekReport } from '../logic/expedition';
 import { addDays, keyToDate } from '../logic/time';
+import type { DepotWeek } from '../types';
 import { run, useStore } from '../store';
 import { Amount, fmt, Portal } from './common';
 
@@ -12,19 +14,22 @@ function weekLabel(weekKey: string): string {
 export function WeeklyReport() {
   const state = useStore();
   const reports = unseenReports(state);
-  if (reports.length === 0) return null;
+  const depotWeeks = unseenDepotWeeks(state);
+  if (reports.length === 0 && depotWeeks.length === 0) return null;
   // After a long break, older weeks are summed up and the latest is shown in full.
   const latest = reports[reports.length - 1];
   const earlier = reports.slice(0, -1);
+  const weekId = latest?.week.id ?? depotWeeks[depotWeeks.length - 1].id;
   const close = () => void run((s) => markReportsSeen(s));
 
   return (
     <Portal>
       <div class="overlay">
         <div class="dialog panel weekly-report" role="dialog" aria-modal="true" aria-label="Weekly report">
-          <div class="eyebrow">// expedition · weekly report</div>
-          <h2>Week of {weekLabel(latest.week.id)}</h2>
-          <WeekSummary report={latest} />
+          <div class="eyebrow">// weekly report</div>
+          <h2>Week of {weekLabel(weekId)}</h2>
+          {latest && <WeekSummary report={latest} />}
+          <DepotSummary weeks={depotWeeks} weekId={weekId} />
           {earlier.length > 0 && (
             <p class="hint small">
               Also closed while you were away: {earlier.length} {earlier.length === 1 ? 'week' : 'weeks'} (
@@ -37,6 +42,35 @@ export function WeeklyReport() {
         </div>
       </div>
     </Portal>
+  );
+}
+
+/** The Salvage Exchange's weekly mission, for the week shown and any earlier ones missed. */
+function DepotSummary({ weeks, weekId }: { weeks: DepotWeek[]; weekId: string }) {
+  const week = weeks.find((w) => w.id === weekId);
+  const earlierDone = weeks.filter((w) => w.id !== weekId && w.completed).length;
+  if ((!week || week.total === 0) && earlierDone === 0) return null;
+  return (
+    <>
+      {week && week.total > 0 && (
+        <p class="report-line">
+          Salvage mission:{' '}
+          {week.completed ? (
+            <>
+              ✓ all {week.total} featured {week.total === 1 ? 'lot' : 'lots'} listed ·{' '}
+              <Amount value={week.rewardSparks} currency="sparks" signed /> <Amount value={week.rewardShards} currency="shards" signed />
+            </>
+          ) : (
+            `${week.listed}/${week.total} featured lots listed · they stay featured`
+          )}
+        </p>
+      )}
+      {earlierDone > 0 && (
+        <p class="hint small">
+          Salvage missions completed in earlier weeks: {earlierDone}.
+        </p>
+      )}
+    </>
   );
 }
 
