@@ -15,6 +15,8 @@ export type FitnessType = 'crossfit' | 'pt' | 'workout' | 'activity';
 /** How many of each fitness activity make up a full target week. */
 export type FitnessTarget = Record<FitnessType, number>;
 
+export type ThemeId = 'default' | 'endgame' | 'market';
+
 export interface Settings {
   deadlines: Record<BucketId, Minutes>;
   soundOn: boolean;
@@ -24,8 +26,8 @@ export interface Settings {
   shardsName: string;
   /** The Frontier Expedition's target week (missing in data from before the event). */
   fitnessTarget?: FitnessTarget;
-  /** UI theme; 'endgame' is unlocked by finishing the expedition. */
-  theme?: 'default' | 'endgame';
+  /** UI theme; 'endgame' is unlocked by finishing the expedition, 'market' by the 20th Salvage Exchange sale. */
+  theme?: ThemeId;
 }
 
 export interface Meta {
@@ -107,7 +109,8 @@ export type LedgerReason =
   | 'event_node'
   | 'event_weekly'
   | 'depot_item'
-  | 'depot_mission';
+  | 'depot_mission'
+  | 'depot_milestone';
 
 export interface LedgerEntry {
   id: string;
@@ -298,6 +301,10 @@ export interface SaleStep {
   ledgerIds: string[];
   /** The featured slot stint this step ended (reopened by undo). */
   endedSlotId?: string;
+  /** Milestones this step reached, the selectors they gave, and the title shown before (all undone with it). */
+  milestones?: string[];
+  selectorIds?: string[];
+  prevTitle?: string | null;
 }
 
 /** Something to sell. */
@@ -366,6 +373,11 @@ export interface DepotState {
   /** Lifetime counts (deleting an item never lowers them). */
   listedCount: number;
   handedOffCount: number;
+  /** Milestones claimed, by id (e.g. "listed-1", "sold-20"). Missing before milestones existed. */
+  milestones?: string[];
+  /** Titles and themes earned here. The title shown is kept on the Frontier Expedition's state. */
+  titles?: string[];
+  themes?: string[];
 }
 
 export interface StoreRecords {

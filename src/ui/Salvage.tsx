@@ -12,6 +12,11 @@ import {
   markHandedOff,
   markPhotographed,
   markSold,
+  milestoneName,
+  milestoneReward,
+  milestonesThrough,
+  moneyRecord,
+  nextMilestone,
   platforms,
   saleFellThrough,
   saveSaleItem,
@@ -20,9 +25,12 @@ import {
   stageOf,
   STAGES,
   stepLabel,
+  depot,
   takeDown,
   undoableStep,
   undoStep,
+  type Milestone,
+  type MilestoneKind,
   type StageResult,
 } from '../logic/depot';
 import type { ActionResult } from '../logic/errors';
@@ -73,6 +81,9 @@ function rewardToast(result: StageResult, what: string) {
     .join(' · ');
   const extras = result.parts.filter((p) => p.startsWith('listed ')).map((p) => p.replace('listed ', ''));
   toast(paid ? `${what} ${paid}${extras.length ? ` (${extras.join(', ')})` : ''}` : what, paid ? 'good' : 'info');
+  for (const m of result.milestones) {
+    toast(`Milestone · ${milestoneName(m)}: ${milestoneReward(m, sparksName)}${m.selector ? ' (in your Bag)' : ''}`, 'good');
+  }
 }
 
 /** Runs a stage action and announces what it paid. */
@@ -163,6 +174,9 @@ export function Salvage() {
           </ul>
         </details>
       )}
+
+      <Milestones />
+      <Money />
 
       {open?.kind === 'add' && <ItemForm categories={view.categories} onClose={close} />}
       {item && open?.kind === 'edit' && <ItemForm item={item} categories={view.categories} onClose={() => setOpen({ kind: 'item', id: item.id })} />}
@@ -621,5 +635,120 @@ function SoldSheet({ item, onClose }: { item: SaleItem; onClose: () => void }) {
         </button>
       </form>
     </Sheet>
+  );
+}
+
+function MilestoneTrack({ kind, count }: { kind: MilestoneKind; count: number }) {
+  const { sparksName } = names();
+  const next = nextMilestone(kind, count);
+  const reached = milestonesThrough(kind, count);
+  const prev = reached[reached.length - 1]?.count ?? 0;
+  const pct = next ? Math.round(((count - prev) / (next.count - prev)) * 100) : 100;
+  const label = kind === 'listed' ? 'Items listed' : 'Items sold';
+  return (
+    <div class="milestone-track">
+      <div class="row between">
+        <span class="label">{label}</span>
+        <b class="mono">{count}</b>
+      </div>
+      <div class="meter" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${label}: ${count}`}>
+        <i style={{ width: `${pct}%` }} />
+      </div>
+      <small class="mono muted">
+        {next ? `Next: ${milestoneName(next)} · ${milestoneReward(next, sparksName)} · ${next.count - count} to go` : 'Every listing milestone reached'}
+      </small>
+    </div>
+  );
+}
+
+function Milestones() {
+  const state = useStore();
+  const { sparksName } = names();
+  const d = depot(state);
+  if (!d) return null;
+  const claimed = new Set(d.milestones ?? []);
+  const reached: Milestone[] = [...milestonesThrough('listed', d.listedCount), ...milestonesThrough('sold', d.handedOffCount)].filter((m) =>
+    claimed.has(m.id),
+  );
+  return (
+    <section class="panel milestones">
+      <h3 class="section-label">Milestones</h3>
+      <MilestoneTrack kind="listed" count={d.listedCount} />
+      <MilestoneTrack kind="sold" count={d.handedOffCount} />
+      <p class="hint small">A sale counts once the item is handed off. Deleting an item never sets these back.</p>
+      {reached.length > 0 && (
+        <ul class="milestone-list">
+          {reached.map((m) => (
+            <li key={m.id}>
+              <span class="mono">✓ {milestoneName(m)}</span> <span class="muted">{milestoneReward(m, sparksName)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function monthLabel(key: string): string {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+}
+
+function Money() {
+  const state = useStore();
+  const money = moneyRecord(state);
+  if (money.total.count === 0) return null;
+  const table = (lines: typeof money.byPlatform, label: (k: string) => string) => (
+    <table class="money-table mono">
+      <thead>
+        <tr>
+          <th />
+          <th>Sold</th>
+          <th>Net</th>
+        </tr>
+      </thead>
+      <tbody>
+        {lines.map((l) => (
+          <tr key={l.key}>
+            <td>{label(l.key)}</td>
+            <td>{l.count}</td>
+            <td>${dollars(l.net)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+  return (
+    <section class="panel money">
+      <h3 class="section-label">Money record</h3>
+      <div class="rank-stats">
+        <div>
+          <span class="label">Gross</span>
+          <b class="mono">${dollars(money.total.gross)}</b>
+        </div>
+        <div>
+          <span class="label">Fees</span>
+          <b class="mono">${dollars(money.total.fees)}</b>
+        </div>
+        <div>
+          <span class="label">Net</span>
+          <b class="mono ok">${dollars(money.total.net)}</b>
+        </div>
+      </div>
+      <p class="mono small muted">
+        {money.total.count} {money.total.count === 1 ? 'sale' : 'sales'}
+        {money.avgDaysToSell !== null &&
+          ` · ${money.avgDaysToSell < 1 ? 'under a day' : `${money.avgDaysToSell.toFixed(1)} days`} from listing to sale on average`}
+      </p>
+      <details>
+        <summary class="section-label">By platform</summary>
+        {table(money.byPlatform, (k) => k)}
+      </details>
+      <details>
+        <summary class="section-label">By month</summary>
+        {table(money.byMonth, monthLabel)}
+      </details>
+      <p class="hint small">For your records only; it never affects rewards.</p>
+    </section>
   );
 }

@@ -2,6 +2,7 @@ import { EXPEDITION } from '../config';
 import type { AppState, Change, EventWeek, ExpeditionRecord, FitnessEntry, FrontierState, LedgerEntry } from '../types';
 import { ActionError, done, type ActionResult } from './errors';
 import { frontier, fitnessTarget } from './event';
+import { earnedTitles } from './honors';
 import { newId } from './ids';
 import { countedEntryIds, rankOf, rpMax, targetPoints } from './rank';
 import { put } from './state';
@@ -271,6 +272,6 @@ export function useSelector(state: AppState, selectorId: string, indulgenceId: s
 export function setActiveTitle(state: AppState, title: string | null): ActionResult {
   const event = frontier(state);
   if (!event) throw new ActionError('The expedition has not started yet.');
-  if (title !== null && !(event.titles ?? []).includes(title)) throw new ActionError('You have not earned that title yet.');
+  if (title !== null && !earnedTitles(state).includes(title)) throw new ActionError('You have not earned that title yet.');
   return done([put('events', { ...event, activeTitle: title })], undefined);
 }

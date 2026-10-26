@@ -128,6 +128,23 @@ export const DEPOT = {
   defaultPlatforms: ['eBay', 'Facebook Marketplace', 'Facebook group', 'Discord'],
   /** Age tags on featured lots, by whole weeks in the slot (the last one covers everything after). */
   ageTags: ['New', '1 week', '2 weeks', '3+ weeks'],
+  /** Lifetime milestones, counted in items (deleting an item never sets them back). */
+  milestones: {
+    listed: [
+      { count: 1, sparks: 0, selector: 4, title: null, theme: null },
+      { count: 10, sparks: 0, selector: 5, title: null, theme: null },
+    ],
+    /** Sales count once an item is handed off. */
+    sold: [
+      { count: 1, sparks: 1_000, selector: null, title: 'Open for Business', theme: null },
+      { count: 5, sparks: 0, selector: 4, title: null, theme: null },
+      { count: 15, sparks: 0, selector: 5, title: null, theme: null },
+      { count: 20, sparks: 0, selector: null, title: 'Quartermaster', theme: 'market' },
+    ],
+  } as Record<'listed' | 'sold', { count: number; sparks: number; selector: 4 | 5 | null; title: string | null; theme: string | null }[]>,
+  /** After the last sales milestone, a 5★ selector every this many sales (30th, 40th, 50th…). */
+  soldRepeatEvery: 10,
+  soldRepeatSelector: 5 as 4 | 5,
 } as const;
 
 export const SCHEMA_VERSION = 4;

@@ -14,6 +14,7 @@ import type {
 } from '../types';
 import { balances } from './actions';
 import { ActionError, done, type ActionResult } from './errors';
+import { frontier } from './event';
 import { newId } from './ids';
 import { getMeta, put } from './state';
 import { addDays, dayKeyOf, deadlineAt, keyToDate, weekKeyOf } from './time';
@@ -184,7 +185,12 @@ export function ensureDepot(state: AppState, now: Date): Change[] {
     };
     return [put('depot', fresh), ...fillSlots(state, now, true)];
   }
-  if (existing.currentWeek >= thisWeek) return fillSlots(state, now, true);
+  // Milestones already reached but not claimed (counts from before milestones existed).
+  const caughtUp = claimMilestones(state, existing, now);
+  if (existing.currentWeek >= thisWeek) {
+    const fills = fillSlots(state, now, true);
+    return caughtUp.milestones.length ? [...fills, ...caughtUp.changes, put('depot', caughtUp.depot)] : fills;
+  }
 
   // Work on a copy of the slots so each reset sees the fills of the one before.
   const slots = new Map(state.featuredSlots);
@@ -216,8 +222,120 @@ export function ensureDepot(state: AppState, now: Date): Change[] {
     for (const c of fills) if (c.store === 'featuredSlots' && c.op === 'put') slots.set(c.value.id, c.value);
     changes.push(...fills);
   }
-  changes.push(put('depot', { ...existing, currentWeek: thisWeek }));
+  changes.push(...caughtUp.changes, put('depot', { ...caughtUp.depot, currentWeek: thisWeek }));
   return changes;
+}
+
+// ---------------------------------------------------------------- milestones
+
+export type MilestoneKind = 'listed' | 'sold';
+
+export interface Milestone {
+  /** e.g. "listed-1", "sold-30". */
+  id: string;
+  kind: MilestoneKind;
+  count: number;
+  sparks: number;
+  selector: 4 | 5 | null;
+  title: string | null;
+  theme: string | null;
+}
+
+function milestone(kind: MilestoneKind, def: Omit<Milestone, 'id' | 'kind'>): Milestone {
+  return { id: `${kind}-${def.count}`, kind, ...def };
+}
+
+/** The repeating 5★ selector for every 10 sales after the last fixed sales milestone. */
+function repeatAt(count: number): Milestone {
+  return milestone('sold', { count, sparks: 0, selector: DEPOT.soldRepeatSelector, title: null, theme: null });
+}
+
+const lastFixedSale = () => DEPOT.milestones.sold[DEPOT.milestones.sold.length - 1].count;
+
+/** Every milestone of a kind up to and including `count`, in order. */
+export function milestonesThrough(kind: MilestoneKind, count: number): Milestone[] {
+  const fixed = DEPOT.milestones[kind].filter((m) => m.count <= count).map((m) => milestone(kind, m));
+  if (kind === 'listed') return fixed;
+  for (let n = lastFixedSale() + DEPOT.soldRepeatEvery; n <= count; n += DEPOT.soldRepeatEvery) fixed.push(repeatAt(n));
+  return fixed;
+}
+
+/** The next milestone of a kind after `count` (sales always have one; listings run out). */
+export function nextMilestone(kind: MilestoneKind, count: number): Milestone | null {
+  const fixed = DEPOT.milestones[kind].find((m) => m.count > count);
+  if (fixed) return milestone(kind, fixed);
+  if (kind === 'listed') return null;
+  const last = lastFixedSale();
+  return repeatAt(last + DEPOT.soldRepeatEvery * (Math.floor((count - last) / DEPOT.soldRepeatEvery) + 1));
+}
+
+function ordinal(n: number): string {
+  const s = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+  return `${n}${s}`;
+}
+
+export function milestoneName(m: Milestone): string {
+  return `${ordinal(m.count)} ${m.kind === 'listed' ? 'listing' : 'sale'}`;
+}
+
+export const THEME_NAMES: Record<string, string> = { endgame: 'Endgame', market: 'Market' };
+
+export function milestoneReward(m: Milestone, sparksName = 'Sparks'): string {
+  return [
+    m.sparks ? `${m.sparks.toLocaleString()} ${sparksName}` : null,
+    m.selector ? `${m.selector}★ selector` : null,
+    m.title ? `“${m.title}” title` : null,
+    m.theme ? `${THEME_NAMES[m.theme] ?? m.theme} theme` : null,
+  ]
+    .filter(Boolean)
+    .join(' + ');
+}
+
+interface Claim {
+  depot: DepotState;
+  /** Selectors, ledger entries and the shown title (not the depot record). */
+  changes: Change[];
+  ledgerIds: string[];
+  selectorIds: string[];
+  milestones: Milestone[];
+  prevTitle?: string | null;
+}
+
+/** Claims every milestone the depot's counts have reached and not yet claimed. */
+function claimMilestones(state: AppState, d: DepotState, now: Date): Claim {
+  const claimed = new Set(d.milestones ?? []);
+  const due = [...milestonesThrough('listed', d.listedCount), ...milestonesThrough('sold', d.handedOffCount)].filter(
+    (m) => !claimed.has(m.id),
+  );
+  const claim: Claim = { depot: d, changes: [], ledgerIds: [], selectorIds: [], milestones: due };
+  if (due.length === 0) return claim;
+  const at = now.toISOString();
+  const titles = [...(d.titles ?? [])];
+  const themes = [...(d.themes ?? [])];
+  for (const m of due) {
+    const note = `Salvage Exchange: ${milestoneName(m)} milestone`;
+    if (m.sparks) {
+      const entry = ledger({ at, currency: 'sparks', amount: m.sparks, reason: 'depot_milestone', note });
+      claim.changes.push(put('ledger', entry));
+      claim.ledgerIds.push(entry.id);
+    }
+    if (m.selector) {
+      const id = newId();
+      claim.changes.push(put('selectors', { id, rarity: m.selector, source: note, createdAt: at, usedAt: null, indulgenceId: null, name: null }));
+      claim.selectorIds.push(id);
+    }
+    if (m.title && !titles.includes(m.title)) titles.push(m.title);
+    if (m.theme && !themes.includes(m.theme)) themes.push(m.theme);
+  }
+  claim.depot = { ...d, milestones: [...claimed, ...due.map((m) => m.id)], titles, themes };
+  // A newly earned title is shown straight away, as on the expedition.
+  const newestTitle = [...due].reverse().find((m) => m.title)?.title;
+  const event = frontier(state);
+  if (newestTitle && event) {
+    claim.prevTitle = event.activeTitle ?? null;
+    claim.changes.push(put('events', { ...event, activeTitle: newestTitle }));
+  }
+  return claim;
 }
 
 // ---------------------------------------------------------------- rewards
@@ -254,6 +372,8 @@ export interface StageResult {
   sparks: number;
   shards: number;
   parts: string[];
+  /** Milestones this step reached. */
+  milestones: Milestone[];
 }
 
 function requireItem(state: AppState, id: string): SaleItem {
@@ -269,9 +389,9 @@ function step(
   kind: SaleStepKind,
   now: Date,
   payments: { reward: { sparks: number; shards: number }; note: string }[],
-  extra: Change[] = [],
-  endedSlotId?: string,
+  more: { extra?: Change[]; endedSlotId?: string; counted?: Claim | null } = {},
 ): ActionResult<StageResult> {
+  const { extra = [], endedSlotId, counted } = more;
   const at = now.toISOString();
   const entries: LedgerEntry[] = [];
   for (const { reward, note } of payments) {
@@ -282,20 +402,32 @@ function step(
   const { log, ...before } = item;
   const logged: SaleStep = { kind, at, dayKey: dayKeyOf(now), before, ledgerIds: entries.map((e) => e.id) };
   if (endedSlotId) logged.endedSlotId = endedSlotId;
+  const changes: Change[] = [];
+  if (counted) {
+    changes.push(...counted.changes, put('depot', counted.depot));
+    if (counted.milestones.length) {
+      logged.ledgerIds.push(...counted.ledgerIds);
+      logged.milestones = counted.milestones.map((m) => m.id);
+      logged.selectorIds = counted.selectorIds;
+      if (counted.prevTitle !== undefined) logged.prevTitle = counted.prevTitle;
+    }
+  }
   // Only the latest step can be undone, and only the same day, so older ones needn't be kept.
   const recent = log.filter((s) => s.dayKey === logged.dayKey);
-  const changes: Change[] = [put('saleItems', { ...updated, log: [...recent, logged] }), ...entries.map((e) => put('ledger', e)), ...extra];
+  changes.unshift(put('saleItems', { ...updated, log: [...recent, logged] }), ...entries.map((e) => put('ledger', e)), ...extra);
   return done(changes, {
     sparks: entries.filter((e) => e.currency === 'sparks').reduce((s, e) => s + e.amount, 0),
     shards: entries.filter((e) => e.currency === 'shards').reduce((s, e) => s + e.amount, 0),
     parts: payments.map((p) => p.note),
+    milestones: counted?.milestones ?? [],
   });
 }
 
-function bumpCounts(state: AppState, listed: number, handedOff: number): Change[] {
+/** Moves the lifetime counts and claims any milestone that reaches. */
+function count(state: AppState, listed: number, handedOff: number, now: Date): Claim | null {
   const d = depot(state);
-  if (!d || (listed === 0 && handedOff === 0)) return [];
-  return [put('depot', { ...d, listedCount: d.listedCount + listed, handedOffCount: d.handedOffCount + handedOff })];
+  if (!d || (listed === 0 && handedOff === 0)) return null;
+  return claimMilestones(state, { ...d, listedCount: d.listedCount + listed, handedOffCount: d.handedOffCount + handedOff }, now);
 }
 
 export interface SaleItemInput {
@@ -393,9 +525,9 @@ function listChanges(
   };
   // A featured lot leaves its slot once it's listed; the slot stays open until the reset.
   const slot = activeSlotOf(state, item.id);
-  const extra: Change[] = [...bumpCounts(state, firstListing ? 1 : 0, 0)];
+  const extra: Change[] = [];
   if (slot) extra.push(put('featuredSlots', { ...slot, endedAt: at, endReason: 'listed' }));
-  return step(item, updated, kind, now, payments, extra, slot?.id);
+  return step(item, updated, kind, now, payments, { extra, endedSlotId: slot?.id, counted: count(state, firstListing ? 1 : 0, 0, now) });
 }
 
 /** Changes which platforms a listed item is on. Pays nothing. */
@@ -462,7 +594,7 @@ export function markHandedOff(state: AppState, id: string, now: Date): ActionRes
   const first = !item.paid.handedOff;
   const updated = { ...item, handedOffAt: now.toISOString(), paid: { ...item.paid, handedOff: true } };
   const payments = first ? [{ reward: DEPOT.handedOff, note: 'handed off' }] : [];
-  return step(item, updated, 'handedOff', now, payments, bumpCounts(state, 0, first ? 1 : 0));
+  return step(item, updated, 'handedOff', now, payments, { counted: count(state, 0, first ? 1 : 0, now) });
 }
 
 /** Undoes an item's latest stage change, the same day only, and takes back what it paid. */
@@ -480,8 +612,13 @@ export function undoStep(state: AppState, id: string, now: Date): ActionResult<{
       `Undoing this takes back ${sparks ? `${sparks} ${sparksName}` : ''}${sparks && shards ? ' and ' : ''}${shards ? `${shards} ${shardsName}` : ''}, but they've already been spent.`,
     );
   }
+  const selectors = (last.selectorIds ?? []).map((sid) => state.selectors.get(sid));
+  if (selectors.some((s) => s?.usedAt)) {
+    throw new ActionError('This reached a milestone whose selector has already been opened, so it can’t be undone.');
+  }
   const at = now.toISOString();
   const changes: Change[] = [put('saleItems', { ...last.before, log: item.log.slice(0, -1) })];
+  for (const s of selectors) if (s) changes.push({ store: 'selectors', op: 'delete', id: s.id });
   for (const e of entries) {
     changes.push(put('ledger', ledger({ at, currency: e.currency, amount: -e.amount, reason: 'undo', note: `Undo: ${e.note}`, itemId: item.id })));
   }
@@ -491,8 +628,37 @@ export function undoStep(state: AppState, id: string, now: Date): ActionResult<{
   }
   const listed = !last.before.firstListedAt && item.firstListedAt ? -1 : 0;
   const handedOff = !last.before.paid.handedOff && item.paid.handedOff ? -1 : 0;
-  changes.push(...bumpCounts(state, listed, handedOff));
+  changes.push(...uncount(state, listed, handedOff, last));
   return done(changes, { kind: last.kind });
+}
+
+/** Moves the counts back for an undone step and takes back the milestones it reached. */
+function uncount(state: AppState, listed: number, handedOff: number, last: SaleStep): Change[] {
+  const d = depot(state);
+  if (!d || (listed === 0 && handedOff === 0 && !last.milestones?.length)) return [];
+  const undone = new Set(last.milestones ?? []);
+  const lost = [...milestonesThrough('listed', d.listedCount), ...milestonesThrough('sold', d.handedOffCount)].filter((m) => undone.has(m.id));
+  const lostTitles = new Set(lost.map((m) => m.title).filter(Boolean));
+  const lostThemes = new Set(lost.map((m) => m.theme).filter(Boolean));
+  const changes: Change[] = [
+    put('depot', {
+      ...d,
+      listedCount: d.listedCount + listed,
+      handedOffCount: d.handedOffCount + handedOff,
+      milestones: (d.milestones ?? []).filter((id) => !undone.has(id)),
+      titles: (d.titles ?? []).filter((t) => !lostTitles.has(t)),
+      themes: (d.themes ?? []).filter((t) => !lostThemes.has(t)),
+    }),
+  ];
+  const event = frontier(state);
+  if (event?.activeTitle && lostTitles.has(event.activeTitle)) {
+    changes.push(put('events', { ...event, activeTitle: last.prevTitle ?? null }));
+  }
+  const meta = getMeta(state);
+  if (meta.settings.theme && lostThemes.has(meta.settings.theme)) {
+    changes.push(put('meta', { ...meta, settings: { ...meta.settings, theme: 'default' } }));
+  }
+  return changes;
 }
 
 /**
@@ -568,6 +734,62 @@ export function depotView(state: AppState, now: Date): DepotView {
     weekKey,
     categories: [...new Set(items.map((i) => i.category).filter(Boolean))].sort(),
   };
+}
+
+// ---------------------------------------------------------------- money record
+
+export interface MoneyLine {
+  key: string;
+  count: number;
+  gross: number;
+  fees: number;
+  net: number;
+}
+
+export interface MoneyRecord {
+  total: MoneyLine;
+  byPlatform: MoneyLine[];
+  /** Newest month first; keys are YYYY-MM. */
+  byMonth: MoneyLine[];
+  /** Average days from first listing to sale, over sales that were listed first (null if none). */
+  avgDaysToSell: number | null;
+}
+
+/** What's been sold, in cents. Information only; never used in reward math. Sold items count before the hand-off. */
+export function moneyRecord(state: AppState): MoneyRecord {
+  const sold = [...state.saleItems.values()].filter((i) => i.sale && i.soldAt);
+  const line = (key: string): MoneyLine => ({ key, count: 0, gross: 0, fees: 0, net: 0 });
+  const total = line('total');
+  const platformLines = new Map<string, MoneyLine>();
+  const monthLines = new Map<string, MoneyLine>();
+  const days: number[] = [];
+  for (const item of sold) {
+    const { price, fees, platform } = item.sale!;
+    const soldAt = new Date(item.soldAt!);
+    const month = `${soldAt.getFullYear()}-${String(soldAt.getMonth() + 1).padStart(2, '0')}`;
+    for (const l of [total, getOr(platformLines, platform, line), getOr(monthLines, month, line)]) {
+      l.count++;
+      l.gross += price;
+      l.fees += fees;
+      l.net += price - fees;
+    }
+    // Items sold without being listed first (marked sold straight away) would count as 0 days.
+    if (item.firstListedAt && item.firstListedAt < item.soldAt!) {
+      days.push((soldAt.getTime() - Date.parse(item.firstListedAt)) / 86_400_000);
+    }
+  }
+  return {
+    total,
+    byPlatform: [...platformLines.values()].sort((a, b) => b.net - a.net),
+    byMonth: [...monthLines.values()].sort((a, b) => (a.key < b.key ? 1 : -1)),
+    avgDaysToSell: days.length ? days.reduce((s, d) => s + d, 0) / days.length : null,
+  };
+}
+
+function getOr<V>(map: Map<string, V>, key: string, make: (key: string) => V): V {
+  let v = map.get(key);
+  if (!v) map.set(key, (v = make(key)));
+  return v;
 }
 
 /** Closed weeks whose mission hasn't been shown in a weekly report yet. */
