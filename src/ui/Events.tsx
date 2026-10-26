@@ -7,10 +7,12 @@ import { play } from '../sound';
 import { run, useStore } from '../store';
 import type { FitnessType } from '../types';
 import { ExpeditionMap } from './ExpeditionMap';
+import { Salvage, SalvageCard } from './Salvage';
 import { Empty, fmt, PageTitle, report, Segmented, Sheet, toast, useNow } from './common';
 
 export function Events({ sub }: { sub?: string }) {
   if (sub === 'frontier') return <Frontier />;
+  if (sub === 'salvage') return <Salvage />;
   return <EventList />;
 }
 
@@ -38,6 +40,7 @@ function EventList() {
         </span>
         <span aria-hidden="true">›</span>
       </a>
+      <SalvageCard />
     </div>
   );
 }

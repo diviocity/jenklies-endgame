@@ -110,4 +110,24 @@ export const WEEKLY_REWARDS = {
   rank20Shards: 5,
 } as const;
 
-export const SCHEMA_VERSION = 3;
+export const DEPOT = {
+  /** Featured lots: the items you're nudged to list next. */
+  slots: 2,
+  /** Per-item rewards, each paid once per item, ever. */
+  photographed: { sparks: 100, shards: 0 },
+  listed: { sparks: 500, shards: 0 },
+  /** Extra when the item was a featured lot at the time it was listed. */
+  featuredBonus: { sparks: 250, shards: 0 },
+  /** Extra when listed within this many calendar days (4 AM days) of being photographed. */
+  freshDays: 3,
+  freshBonus: { sparks: 250, shards: 0 },
+  handedOff: { sparks: 500, shards: 2 },
+  /** Listing every featured lot of the week before the reset. */
+  mission: { sparks: 500, shards: 5 },
+  /** Platforms offered out of the box; you can add your own. */
+  defaultPlatforms: ['eBay', 'Facebook Marketplace', 'Facebook group', 'Discord'],
+  /** Age tags on featured lots, by whole weeks in the slot (the last one covers everything after). */
+  ageTags: ['New', '1 week', '2 weeks', '3+ weeks'],
+} as const;
+
+export const SCHEMA_VERSION = 4;

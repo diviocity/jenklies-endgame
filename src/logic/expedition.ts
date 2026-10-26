@@ -243,10 +243,12 @@ export function unseenReports(state: AppState): WeekReport[] {
     .filter((r) => !r.week.seen);
 }
 
+/** Marks every closed week as reported, the Salvage Exchange's included. */
 export function markReportsSeen(state: AppState): ActionResult {
-  const changes = [...state.eventWeeks.values()]
-    .filter((w) => !w.seen)
-    .map((w) => put('eventWeeks', { ...w, seen: true }));
+  const changes = [
+    ...[...state.eventWeeks.values()].filter((w) => !w.seen).map((w) => put('eventWeeks', { ...w, seen: true })),
+    ...[...state.depotWeeks.values()].filter((w) => !w.seen).map((w) => put('depotWeeks', { ...w, seen: true })),
+  ];
   return done(changes, undefined);
 }
 

@@ -1867,6 +1867,283 @@ span.r5 {
   color: var(--r5);
 }
 
+/* ---------------------------------------------------------------- salvage exchange */
+
+/* Emblem: a stacked pair of crates with a tag. */
+.crate-art i:nth-child(1),
+.crate-art i:nth-child(2) {
+  border: 1px solid var(--line-2);
+  background: repeating-linear-gradient(90deg, #22262c 0 5px, #2a2f36 5px 6px);
+}
+
+.crate-art i:nth-child(1) {
+  left: 6px;
+  bottom: 4px;
+  width: 26px;
+  height: 20px;
+}
+
+.crate-art i:nth-child(2) {
+  left: 20px;
+  bottom: 24px;
+  width: 22px;
+  height: 16px;
+  border-bottom-color: var(--line-2);
+}
+
+.crate-art::after {
+  content: '';
+  position: absolute;
+  right: 6px;
+  bottom: 8px;
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  transform: rotate(45deg);
+}
+
+.salvage .mission {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mission-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mission-head b:not(.mission-count) {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+}
+
+.mission-count {
+  font-size: 26px;
+  color: var(--accent);
+}
+
+.mission-count.ok,
+.mission.done .mission-count {
+  color: var(--ok);
+}
+
+.mission small .amount {
+  font-size: 12px;
+}
+
+.lots {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lot-name {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.lot-name small {
+  font-size: 13px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.open-slot {
+  border-style: dashed;
+  background: transparent;
+  gap: 4px;
+}
+
+.age {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border: 1px solid currentColor;
+}
+
+.age-0 {
+  color: var(--ok);
+}
+
+.age-1 {
+  color: var(--accent);
+}
+
+.age-2 {
+  color: var(--late);
+}
+
+.age-3 {
+  color: var(--danger);
+}
+
+.stage-track {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stage-track i {
+  width: 18px;
+  height: 4px;
+  background: var(--line-2);
+}
+
+.stage-track i.on {
+  background: var(--accent);
+}
+
+.stage-track span {
+  margin-left: 8px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stage-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.stage-actions .row {
+  width: 100%;
+}
+
+.stage-actions .btn {
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.15;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.stage-actions .btn small {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.up-next {
+  margin: -4px 0 0;
+  font-size: 13px;
+}
+
+.up-next .label {
+  margin-right: 6px;
+}
+
+.sale-row.stage-sold::before {
+  background: var(--ok);
+}
+
+.cleared summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.cleared summary::before {
+  content: '▸ ';
+}
+
+.cleared[open] summary::before {
+  content: '▾ ';
+}
+
+.item-sheet .item-notes {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.featured-note {
+  margin: 0;
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.stage-dates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
+  font-size: 12px;
+}
+
+.platform-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.platform-toggles button {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.platform-toggles button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.add-platform {
+  margin-top: 8px;
+}
+
+.add-platform input {
+  flex: 1;
+  min-width: 0;
+}
+
+.wrap {
+  flex-wrap: wrap;
+}
+
 /* The Endgame theme, unlocked by finishing the expedition: midnight blue and gold. */
 :root[data-theme='endgame'] {
   --bg: #080a12;

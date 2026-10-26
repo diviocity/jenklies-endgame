@@ -2,6 +2,7 @@ import { useEffect, useReducer } from 'preact/hooks';
 import { commit, loadAll, replaceAll } from './db';
 import { ActionError, ensureDay, type ActionResult } from './logic/actions';
 import { restoredData, type BackupFile } from './logic/backup';
+import { ensureDepot } from './logic/depot';
 import { ensureEvent } from './logic/event';
 import { settleExpedition, type MapNode } from './logic/expedition';
 import { migrate } from './logic/migrate';
@@ -62,9 +63,9 @@ async function settle(now: Date): Promise<boolean> {
   return true;
 }
 
-/** Starts a new day's snapshot past 4 AM, runs the weekly event reset when one is due, and settles the map. */
+/** Starts a new day's snapshot past 4 AM, runs the weekly event resets when due, and settles the map. */
 export async function tick(now = new Date()): Promise<void> {
-  const changes = [...ensureDay(state, now), ...ensureEvent(state, now)];
+  const changes = [...ensureDay(state, now), ...ensureEvent(state, now), ...ensureDepot(state, now)];
   if (changes.length) await save(changes);
   const settled = await settle(now);
   if (changes.length || settled) notify();
