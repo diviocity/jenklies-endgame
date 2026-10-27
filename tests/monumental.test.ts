@@ -152,11 +152,12 @@ describe('days off', () => {
 });
 
 describe('the boss', () => {
-  it('first arrives at the reset after the event starts', () => {
-    const state = setup();
-    expect(monumental(state)!.fight).toBeNull();
-    expect(currentFight(state, oct(29))).toBeNull();
+  it('is there straight away, at full HP however late in the week the event starts', () => {
+    const state = setup(); // a Wednesday
+    expect(currentFight(state, oct(29))).toMatchObject({ name: 'Lethargos', fight: { tier: 1, weekKey: '2026-10-26' }, hp: { hp: 300 } });
+    work(state, oct(29, 9), 60);
     tick(state, nov(2, 5));
+    expect(state.bossWeeks.get('2026-10-26')).toMatchObject({ result: 'escaped', damage: 60, nextTier: 1 });
     expect(currentFight(state, nov(2, 5))).toMatchObject({ name: 'Lethargos', hp: { hp: 300 } });
   });
 
@@ -240,9 +241,11 @@ describe('the ladder', () => {
   it('a mostly hibernated week has no result and leaves the ladder alone', () => {
     const state = setup();
     tick(state, nov(2, 5));
+    const before = monumental(state)!; // the first week was escaped
+    expect(before.escapes).toBe(1);
     run(state, scheduleHibernation(state, '2026-11-03', '2026-11-08', nov(2, 6)));
     tick(state, nov(9, 5));
     expect(state.bossWeeks.get('2026-11-02')).toMatchObject({ result: 'skipped', rewardSparks: 0, seen: true });
-    expect(monumental(state)).toMatchObject({ tier: 1, escapes: 0 });
+    expect(monumental(state)).toMatchObject({ tier: 1, escapes: 1 });
   });
 });

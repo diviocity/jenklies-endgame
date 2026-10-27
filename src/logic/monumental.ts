@@ -198,7 +198,7 @@ function spawn(tier: number, weekKey: string): BossFight {
 /**
  * Starts the event if needed, ends a window left running into hibernation, and runs every
  * weekly reset that's due: settles the week's boss, pays its reward, moves the ladder and
- * brings in the next boss. The first boss arrives at the first reset after the event starts.
+ * brings in the next boss. The first boss (Tier 1) starts straight away, at full HP.
  */
 export function ensureMonumental(state: AppState, now: Date): Change[] {
   const thisWeek = weekKeyOf(dayKeyOf(now));
@@ -212,7 +212,8 @@ export function ensureMonumental(state: AppState, now: Date): Change[] {
   }
   const existing = monumental(state);
   if (!existing) {
-    changes.push(put('monumental', { id: MONUMENTAL_ID, startedWeek: thisWeek, currentWeek: thisWeek, tier: 1, escapes: 0, fight: null }));
+    // The first boss is there straight away, at full HP however late in the week it is.
+    changes.push(put('monumental', { id: MONUMENTAL_ID, startedWeek: thisWeek, currentWeek: thisWeek, tier: 1, escapes: 0, fight: spawn(1, thisWeek) }));
     return changes;
   }
   if (existing.currentWeek >= thisWeek) return changes;

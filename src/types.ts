@@ -543,7 +543,7 @@ export interface MonumentalState {
   tier: number;
   /** Escapes in a row (two drop a tier). Skipped weeks don't count either way. */
   escapes: number;
-  /** This week's boss (null in the first, partial week). */
+  /** This week's boss (null only before the event has set one up). */
   fight: BossFight | null;
 }
 

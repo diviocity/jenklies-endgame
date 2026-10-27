@@ -14,7 +14,7 @@ Every number lives in `src/config.ts` (`MONUMENTAL`). The rules are in `src/logi
 - **3-hour cap:** a window counts for at most 3 hours. If the app is opened with a window running longer (or End is tapped after 3 hours), it asks **"When did you stop?"** with a time picker; anything past the cap is cut.
 - **Forgotten Start:** today's windows can be added by hand, adjusted or deleted (today only, up to 3 hours, no overlaps).
 - **Any day counts,** weekends included. Logging is off while hibernating, and a window running when hibernation starts ends at that moment.
-- **The first week** has no boss: the first one arrives at the first Monday 4 AM reset after the event starts. Focus logged before then is practice.
+- **The first boss** (Lethargos, Tier 1) is there straight away, at full HP however late in the week the event starts.
 
 ## Damage
 

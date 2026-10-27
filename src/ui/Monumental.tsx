@@ -75,7 +75,7 @@ export function MonumentalCard() {
     ? fight.hp.skipped
       ? `${fight.name} · skipped this week`
       : `Tier ${fight.fight.tier} · ${fight.name} · ${fight.defeatedAt ? 'defeated' : `${fmt(Math.max(0, fight.hp.hp - fight.damage))} HP left`}`
-    : `First boss arrives Monday · Tier ${m?.tier ?? 1}`;
+    : `Next boss arrives Monday · Tier ${m?.tier ?? 1}`;
   return (
     <a class="event-card panel monumental-card" href="#/events/monumental">
       <span class="event-art boss-art" aria-hidden="true">
@@ -171,8 +171,7 @@ export function Monumental() {
       ) : (
         <section class="panel boss waiting">
           <Sigil name={bossOf((m?.tier ?? 1) - 1).name} hidden />
-          <b>The first boss arrives Monday at 4 AM.</b>
-          <p class="hint">Focus you log before then is practice: it shows in your windows but doesn’t deal damage.</p>
+          <b>The next boss arrives Monday at 4 AM.</b>
         </section>
       )}
       {hibernating ? <p class="paused-note">Hibernating: focus logging is paused until you wake up.</p> : <FocusControl />}
@@ -264,8 +263,7 @@ function FocusControl() {
     const result = report(await run((s, at) => endFocus(s, at)));
     if (result === undefined) return;
     play('complete');
-    const fight = currentFight(state, now);
-    toast(fight ? `Window ended: ${result.minutes} min` : `Practice window: ${result.minutes} min`, 'good');
+    toast(`Window ended: ${result.minutes} min`, 'good');
   };
   if (w) {
     const elapsed = now.getTime() - Date.parse(w.startAt);
