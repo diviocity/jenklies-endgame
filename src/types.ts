@@ -15,7 +15,7 @@ export type FitnessType = 'crossfit' | 'pt' | 'workout' | 'activity';
 /** How many of each fitness activity make up a full target week. */
 export type FitnessTarget = Record<FitnessType, number>;
 
-export type ThemeId = 'default' | 'endgame' | 'market' | 'field';
+export type ThemeId = 'default' | 'endgame' | 'market' | 'field' | 'monolith';
 
 export interface Settings {
   deadlines: Record<BucketId, Minutes>;
@@ -126,7 +126,8 @@ export type LedgerReason =
   | 'provisions_card'
   | 'provisions_ration'
   | 'provisions_milestone'
-  | 'monumental_weekly';
+  | 'monumental_weekly'
+  | 'monumental_milestone';
 
 export interface LedgerEntry {
   id: string;
@@ -511,6 +512,28 @@ export interface BossFight {
   tier: number;
   /** Index into MONUMENTAL.tiers of the boss fought. */
   boss: number;
+  /** An Agony week: a random boss at 25 hours with a modifier. */
+  agony?: boolean;
+  /** The Agony modifier's id. */
+  modifier?: string | null;
+}
+
+/** An Agony Mode modifier. Each sets only the rules it changes. */
+export interface AgonyModifier {
+  id: string;
+  name: string;
+  text: string;
+  /** Windows shorter than this deal no damage. */
+  minWindowMinutes?: number;
+  /** Chains need a gap this short or shorter. */
+  chainGapMinutes?: number;
+  /** The chain multiplier can't go above this. */
+  chainCap?: number;
+  /** Deep-focus crit bonus instead of the usual one. */
+  critBonus?: number;
+  hpMultiplier?: number;
+  /** Workdays with less damage than this heal the boss this share of max HP at the rollover. */
+  regen?: { minDamage: number; healShare: number };
 }
 
 /** A closed week of Monumental Works. */
@@ -531,6 +554,11 @@ export interface BossWeek {
   rewardShards: number;
   closedAt: string;
   seen: boolean;
+  /** Agony week, and its modifier. */
+  agony?: boolean;
+  modifier?: string | null;
+  /** HP healed by a Regenerating boss. */
+  healed?: number;
 }
 
 /** Monumental Works' running state: the ladder and this week's boss. */
@@ -545,6 +573,11 @@ export interface MonumentalState {
   escapes: number;
   /** This week's boss (null only before the event has set one up). */
   fight: BossFight | null;
+  /** One-time rewards claimed, by id (e.g. "first-3", "akrasia", "agony-10"). */
+  milestones?: string[];
+  /** Titles and themes earned here. The title shown is kept on the Frontier Expedition's state. */
+  titles?: string[];
+  themes?: string[];
 }
 
 /** A hibernation period: an app-wide pause. Ended periods are read-only. */

@@ -1,10 +1,11 @@
 import { eventShards, eventSparks, MONUMENTAL } from '../config';
-import type { AppState, BossFight, BossWeek, Change, FocusWindow, LedgerEntry, MonumentalState } from '../types';
+import type { AgonyModifier, AppState, BossFight, BossWeek, Change, FocusWindow, LedgerEntry, MonumentalState } from '../types';
 import { ActionError, done, type ActionResult } from './errors';
+import { frontier } from './event';
 import { activeHibernation, isHibernatedDay, requireAwake } from './hibernation';
 import { newId } from './ids';
 import { put, withChanges } from './state';
-import { addDays, dayKeyOf, weekdayOf, weekKeyOf } from './time';
+import { addDays, dayKeyOf, deadlineAt, weekdayOf, weekKeyOf } from './time';
 
 // Monumental Works: focused work as a weekly boss fight. Long, unbroken stretches hit harder,
 // and the boss gets tougher as you win.
@@ -50,23 +51,36 @@ export interface WindowDamage {
   endsAt: number;
 }
 
+export function modifierOf(id: string | null | undefined): AgonyModifier | null {
+  return MONUMENTAL.modifiers.find((m) => m.id === id) ?? null;
+}
+
+/** The chain multiplier for a window's position in its chain (capped by a modifier, if any). */
+export function chainMultiplier(chain: number, mod: AgonyModifier | null = null): number {
+  const m = MONUMENTAL.chainMultipliers[Math.min(chain, MONUMENTAL.chainMultipliers.length - 1)];
+  return mod?.chainCap !== undefined ? Math.min(m, mod.chainCap) : m;
+}
+
 /**
  * Damage for a week's windows, in order. Short windows deal half; windows that start within
  * 15 minutes of the previous one's end continue a chain (1×, 1.25×, then 1.5×); a window of
- * 90 minutes or more is a deep-focus crit (+25%). The multipliers combine.
+ * 90 minutes or more is a deep-focus crit (+25%). The multipliers combine. An Agony modifier
+ * can change these rules.
  */
-export function windowDamage(windows: FocusWindow[], now: Date): WindowDamage[] {
+export function windowDamage(windows: FocusWindow[], now: Date, mod: AgonyModifier | null = null): WindowDamage[] {
+  const gapLimit = mod?.chainGapMinutes ?? MONUMENTAL.chainGapMinutes;
+  const critBonus = mod?.critBonus ?? MONUMENTAL.critBonus;
   const sorted = [...windows].sort((a, b) => (a.startAt < b.startAt ? -1 : 1));
   const out: WindowDamage[] = [];
   for (const w of sorted) {
     const prev = out[out.length - 1];
     const gap = prev ? (Date.parse(w.startAt) - prev.endsAt) / MINUTE : Infinity;
-    const chain = prev && gap >= 0 && gap <= MONUMENTAL.chainGapMinutes ? prev.chain + 1 : 0;
+    const chain = prev && gap >= 0 && gap <= gapLimit ? prev.chain + 1 : 0;
     const minutes = windowMinutes(w, now);
     const short = minutes < MONUMENTAL.shortMinutes;
     const crit = minutes >= MONUMENTAL.critMinutes;
-    const chainMult = MONUMENTAL.chainMultipliers[Math.min(chain, MONUMENTAL.chainMultipliers.length - 1)];
-    const multiplier = chainMult * (short ? MONUMENTAL.shortMultiplier : 1) * (crit ? 1 + MONUMENTAL.critBonus : 1);
+    const blocked = mod?.minWindowMinutes !== undefined && minutes < mod.minWindowMinutes;
+    const multiplier = blocked ? 0 : chainMultiplier(chain, mod) * (short ? MONUMENTAL.shortMultiplier : 1) * (crit ? 1 + critBonus : 1);
     out.push({ window: w, minutes, chain, short, crit, multiplier, damage: Math.round(minutes * multiplier), endsAt: windowEnd(w, now) });
   }
   return out;
@@ -84,6 +98,11 @@ export function isDayOff(state: AppState, dayKey: string): boolean {
   return state.daysOff.has(dayKey);
 }
 
+/** A boss's name: "Agony Lethargos" for an Agony variant. */
+export function bossName(boss: number, agony = false): string {
+  return `${agony ? 'Agony ' : ''}${MONUMENTAL.tiers[boss].name}`;
+}
+
 export interface BossHp {
   /** Full HP for the tier. */
   max: number;
@@ -96,9 +115,10 @@ export interface BossHp {
   skipped: boolean;
 }
 
-/** A week's boss HP: tier hours × 60, prorated by active workdays (Mon–Fri, not off, not hibernated) ÷ 5. */
+/** A week's boss HP: tier hours × 60 (25 hours in Agony), prorated by active workdays (Mon–Fri, not off, not hibernated) ÷ 5. */
 export function bossHp(state: AppState, fight: BossFight, now: Date): BossHp {
-  const max = MONUMENTAL.tiers[fight.boss].hours * 60;
+  const hours = fight.agony ? MONUMENTAL.agony.hours : MONUMENTAL.tiers[fight.boss].hours;
+  const max = Math.round(hours * 60 * (modifierOf(fight.modifier)?.hpMultiplier ?? 1));
   let hibernated = 0;
   let off = 0;
   for (const d of WORKDAYS(fight.weekKey)) {
@@ -114,10 +134,13 @@ export interface FightStatus {
   fight: BossFight;
   name: string;
   flavor: string;
+  modifier: AgonyModifier | null;
   hp: BossHp;
-  /** Damage from ended windows, and the running window's pending damage. */
+  /** Damage that counts against HP (after any healing), and the running window's pending damage. */
   damage: number;
   pending: number;
+  /** HP a Regenerating boss has healed. */
+  healed: number;
   /** When the boss fell (null if it hasn't). */
   defeatedAt: string | null;
   /** Today's assault marker: a fifth of HP. Display only. */
@@ -128,24 +151,57 @@ export interface FightStatus {
 
 export function fightStatus(state: AppState, fight: BossFight, now: Date): FightStatus {
   const hp = bossHp(state, fight, now);
-  const windows = windowDamage(weekWindows(state, fight.weekKey), now);
+  const mod = modifierOf(fight.modifier);
+  const windows = windowDamage(weekWindows(state, fight.weekKey), now, mod);
   const today = dayKeyOf(now);
-  let damage = 0;
+  // A timeline of hits (windows ending) and heals (a Regenerating boss at each quiet workday's rollover).
+  type Event = { at: number; damage: number; heal: number };
+  const events: Event[] = [];
   let pending = 0;
   let todayDamage = 0;
+  for (const w of windows) {
+    if (w.window.dayKey === today) todayDamage += w.damage;
+    if (w.window.endAt === null) pending += w.damage;
+    else events.push({ at: w.endsAt, damage: w.damage, heal: 0 });
+  }
+  if (mod?.regen) {
+    for (const d of WORKDAYS(fight.weekKey)) {
+      const rollover = deadlineAt(addDays(d, 1), 4 * 60).getTime();
+      if (rollover > now.getTime() || isDayOff(state, d) || isHibernatedDay(state, d, now)) continue;
+      const dealt = windows.filter((w) => w.window.dayKey === d && w.window.endAt !== null).reduce((sum, w) => sum + w.damage, 0);
+      if (dealt < mod.regen.minDamage) events.push({ at: rollover, damage: 0, heal: Math.round(hp.max * mod.regen.healShare) });
+    }
+  }
+  let damage = 0;
+  let healed = 0;
   let defeatedAt: string | null = null;
-  for (const w of [...windows].sort((a, b) => a.endsAt - b.endsAt)) {
-    if (w.window.endAt === null) {
-      pending += w.damage;
-      if (w.window.dayKey === today) todayDamage += w.damage;
+  for (const e of events.sort((a, b) => a.at - b.at)) {
+    if (e.heal) {
+      // A defeated boss stays down.
+      if (defeatedAt) continue;
+      const heal = Math.min(e.heal, damage);
+      damage -= heal;
+      healed += heal;
       continue;
     }
-    damage += w.damage;
-    if (w.window.dayKey === today) todayDamage += w.damage;
-    if (!defeatedAt && hp.hp > 0 && damage >= hp.hp) defeatedAt = new Date(w.endsAt).toISOString();
+    damage += e.damage;
+    if (!defeatedAt && hp.hp > 0 && damage >= hp.hp) defeatedAt = new Date(e.at).toISOString();
   }
   const boss = bossOf(fight.boss);
-  return { fight, name: boss.name, flavor: boss.flavor, hp, damage, pending, defeatedAt, todayTarget: Math.round(hp.hp / 5), todayDamage, windows };
+  return {
+    fight,
+    name: bossName(fight.boss, fight.agony),
+    flavor: boss.flavor,
+    modifier: mod,
+    hp,
+    damage,
+    pending,
+    healed,
+    defeatedAt,
+    todayTarget: Math.round(hp.hp / 5),
+    todayDamage,
+    windows,
+  };
 }
 
 /** This week's fight, if there's a boss yet. */
@@ -157,8 +213,9 @@ export function currentFight(state: AppState, now: Date): FightStatus | null {
 
 // ---------------------------------------------------------------- rewards and the ladder
 
-/** The full reward for defeating a tier (unscaled). */
+/** The full reward for defeating a tier (unscaled). Agony (Tier 12) pays its own. */
 export function defeatReward(tier: number): { sparks: number; shards: number } {
+  if (tier >= MONUMENTAL.agonyTier) return { sparks: MONUMENTAL.agony.sparks, shards: MONUMENTAL.agony.shards };
   const d = MONUMENTAL.defeat;
   return { sparks: d.sparks + d.sparksPerTier * (tier - 1), shards: d.shards + Math.floor((tier - 1) / d.shardsEveryTiers) };
 }
@@ -183,24 +240,43 @@ export function weekReward(tier: number, hp: number, damage: number): { sparks: 
   };
 }
 
-/** The ladder after a week: a defeat climbs a tier, two escapes in a row drop one, a skipped week changes nothing. */
+/**
+ * The ladder after a week: a defeat climbs a tier (defeating Akrasia opens Agony Mode, Tier 12,
+ * which a defeat keeps), two escapes in a row drop one, a skipped week changes nothing.
+ */
 export function climb(tier: number, escapes: number, result: BossWeek['result']): { tier: number; escapes: number } {
   if (result === 'skipped') return { tier, escapes };
-  if (result === 'defeated') return { tier: Math.min(MONUMENTAL.tiers.length, tier + 1), escapes: 0 };
+  if (result === 'defeated') return { tier: Math.min(MONUMENTAL.agonyTier, tier + 1), escapes: 0 };
   if (escapes + 1 >= 2) return { tier: Math.max(1, tier - 1), escapes: 0 };
   return { tier, escapes: escapes + 1 };
 }
 
-function spawn(tier: number, weekKey: string): BossFight {
-  return { weekKey, tier, boss: tier - 1 };
+/** A random pick from 0..n−1, other than `not`. */
+function pickOther(n: number, not: number, rng: () => number): number {
+  const options = Array.from({ length: n }, (_, i) => i).filter((i) => i !== not);
+  return options[Math.floor(rng() * options.length) % options.length];
+}
+
+/**
+ * The boss for a week. On Tiers 1–11 it's that tier's boss. In Agony Mode it's a random boss
+ * from Tiers 1–11 with a random modifier, neither the same as the week before.
+ */
+export function spawn(tier: number, weekKey: string, previous: BossFight | null, rng: () => number = Math.random): BossFight {
+  if (tier < MONUMENTAL.agonyTier) return { weekKey, tier, boss: tier - 1 };
+  const prevBoss = previous?.agony ? previous.boss : -1;
+  const prevMod = MONUMENTAL.modifiers.findIndex((m) => m.id === (previous?.agony ? previous.modifier : null));
+  const boss = pickOther(MONUMENTAL.tiers.length, prevBoss, rng);
+  const modifier = MONUMENTAL.modifiers[pickOther(MONUMENTAL.modifiers.length, prevMod, rng)].id;
+  return { weekKey, tier, boss, agony: true, modifier };
 }
 
 /**
  * Starts the event if needed, ends a window left running into hibernation, and runs every
- * weekly reset that's due: settles the week's boss, pays its reward, moves the ladder and
- * brings in the next boss. The first boss (Tier 1) starts straight away, at full HP.
+ * weekly reset that's due: settles the week's boss, pays its reward, moves the ladder, claims
+ * any one-time rewards and brings in the next boss. The first boss (Tier 1) starts straight
+ * away, at full HP.
  */
-export function ensureMonumental(state: AppState, now: Date): Change[] {
+export function ensureMonumental(state: AppState, now: Date, rng: () => number = Math.random): Change[] {
   const thisWeek = weekKeyOf(dayKeyOf(now));
   const changes: Change[] = [];
   // A window can't run through hibernation: it ends when hibernation started.
@@ -213,13 +289,19 @@ export function ensureMonumental(state: AppState, now: Date): Change[] {
   const existing = monumental(state);
   if (!existing) {
     // The first boss is there straight away, at full HP however late in the week it is.
-    changes.push(put('monumental', { id: MONUMENTAL_ID, startedWeek: thisWeek, currentWeek: thisWeek, tier: 1, escapes: 0, fight: spawn(1, thisWeek) }));
+    changes.push(put('monumental', { id: MONUMENTAL_ID, startedWeek: thisWeek, currentWeek: thisWeek, tier: 1, escapes: 0, fight: spawn(1, thisWeek, null) }));
     return changes;
   }
-  if (existing.currentWeek >= thisWeek) return changes;
+  if (existing.currentWeek >= thisWeek) {
+    // One-time rewards for results already recorded but not yet claimed.
+    const late = claimMilestones(state, existing, [...state.bossWeeks.values()], now);
+    if (late.changes.length || late.patch.milestones) changes.push(...late.changes, put('monumental', { ...existing, ...late.patch }));
+    return changes;
+  }
 
   const view = withChanges(state, changes);
   const at = now.toISOString();
+  const closed: BossWeek[] = [];
   let { tier, escapes, fight } = existing;
   let week = existing.currentWeek;
   while (week < thisWeek) {
@@ -243,9 +325,12 @@ export function ensureMonumental(state: AppState, now: Date): Change[] {
         rewardShards: reward.shards,
         closedAt: at,
         seen: skipped,
+        ...(fight.agony ? { agony: true, modifier: fight.modifier ?? null } : {}),
+        ...(status.healed ? { healed: status.healed } : {}),
       };
+      closed.push(record);
       changes.push(put('bossWeeks', record));
-      const note = `Monumental Works: ${bossOf(fight.boss).name} ${result === 'defeated' ? 'defeated' : 'escaped'} (week of ${week})`;
+      const note = `Monumental Works: ${status.name} ${result === 'defeated' ? 'defeated' : 'escaped'} (week of ${week})`;
       const base = { at, reason: 'monumental_weekly' as const, note };
       if (reward.sparks) changes.push(put('ledger', { id: newId(), ...base, currency: 'sparks', amount: reward.sparks } as LedgerEntry));
       if (reward.shards) changes.push(put('ledger', { id: newId(), ...base, currency: 'shards', amount: reward.shards } as LedgerEntry));
@@ -253,15 +338,134 @@ export function ensureMonumental(state: AppState, now: Date): Change[] {
       escapes = next.escapes;
     }
     week = addDays(week, 7);
-    fight = spawn(tier, week);
+    fight = spawn(tier, week, fight, rng);
   }
-  changes.push(put('monumental', { ...existing, currentWeek: thisWeek, tier, escapes, fight }));
+  const claimed = claimMilestones(view, existing, [...state.bossWeeks.values(), ...closed], now);
+  changes.push(...claimed.changes, put('monumental', { ...existing, ...claimed.patch, currentWeek: thisWeek, tier, escapes, fight }));
   return changes;
 }
 
 /** Closed weeks whose result hasn't been shown in a weekly report yet. */
 export function unseenBossWeeks(state: AppState): BossWeek[] {
   return [...state.bossWeeks.values()].filter((w) => !w.seen).sort((a, b) => (a.id < b.id ? -1 : 1));
+}
+
+// ---------------------------------------------------------------- one-time rewards and the Bestiary
+
+export interface WorksMilestone {
+  id: string;
+  name: string;
+  selector: 4 | 5 | null;
+  title: string | null;
+  theme: string | null;
+}
+
+/** The one-time rewards a history of results has earned. */
+export function milestonesEarned(weeks: BossWeek[]): WorksMilestone[] {
+  const wins = weeks.filter((w) => w.result === 'defeated');
+  const out: WorksMilestone[] = [];
+  for (const t of MONUMENTAL.firstDefeatSelectors) {
+    if (wins.some((w) => !w.agony && w.tier === t)) {
+      out.push({ id: `first-${t}`, name: `First Tier ${t} defeat`, selector: 4, title: null, theme: null });
+    }
+  }
+  if (wins.some((w) => !w.agony && w.tier === MONUMENTAL.tiers.length)) {
+    const a = MONUMENTAL.akrasia;
+    out.push({ id: 'akrasia', name: `First defeat of ${MONUMENTAL.tiers[MONUMENTAL.tiers.length - 1].name}`, selector: a.selector, title: a.title, theme: a.theme });
+  }
+  const agony = wins.filter((w) => w.agony);
+  if (new Set(agony.map((w) => w.boss)).size >= MONUMENTAL.tiers.length) {
+    const a = MONUMENTAL.allAgony;
+    out.push({ id: 'agony-all', name: 'Every Agony variant defeated', selector: a.selector, title: a.title, theme: null });
+  }
+  for (let n = MONUMENTAL.agonyVictoriesEvery; n <= agony.length; n += MONUMENTAL.agonyVictoriesEvery) {
+    out.push({ id: `agony-${n}`, name: `${n} Agony victories`, selector: 5, title: null, theme: null });
+  }
+  return out;
+}
+
+/** Claims one-time rewards earned and not yet claimed: selectors into the Bag, titles (shown straight away) and the theme. */
+function claimMilestones(
+  state: AppState,
+  m: MonumentalState,
+  weeks: BossWeek[],
+  now: Date,
+): { changes: Change[]; patch: Partial<MonumentalState> } {
+  const have = new Set(m.milestones ?? []);
+  const due = milestonesEarned(weeks).filter((x) => !have.has(x.id));
+  if (due.length === 0) return { changes: [], patch: {} };
+  const at = now.toISOString();
+  const titles = [...(m.titles ?? [])];
+  const themes = [...(m.themes ?? [])];
+  const changes: Change[] = [];
+  let newest: string | null = null;
+  for (const x of due) {
+    const source = `Monumental Works: ${x.name}`;
+    if (x.selector) changes.push(put('selectors', { id: newId(), rarity: x.selector, source, createdAt: at, usedAt: null, indulgenceId: null, name: null }));
+    if (x.title && !titles.includes(x.title)) {
+      titles.push(x.title);
+      newest = x.title;
+    }
+    if (x.theme && !themes.includes(x.theme)) themes.push(x.theme);
+  }
+  const event = frontier(state);
+  if (newest && event) changes.push(put('events', { ...event, activeTitle: newest }));
+  return { changes, patch: { milestones: [...have, ...due.map((x) => x.id)], titles, themes } };
+}
+
+export interface BestiaryEntry {
+  boss: number;
+  agony: boolean;
+  name: string;
+  flavor: string;
+  defeats: number;
+  firstDefeat: string | null;
+}
+
+/** Every boss and Agony variant, with when it was first defeated and how often. */
+export function bestiary(state: AppState): BestiaryEntry[] {
+  const wins = [...state.bossWeeks.values()].filter((w) => w.result === 'defeated').sort((a, b) => (a.id < b.id ? -1 : 1));
+  const entry = (boss: number, agony: boolean): BestiaryEntry => {
+    const mine = wins.filter((w) => w.boss === boss && !!w.agony === agony);
+    return { boss, agony, name: bossName(boss, agony), flavor: MONUMENTAL.tiers[boss].flavor, defeats: mine.length, firstDefeat: mine[0]?.defeatedAt ?? null };
+  };
+  const all = MONUMENTAL.tiers.map((_, i) => i);
+  return [...all.map((i) => entry(i, false)), ...all.map((i) => entry(i, true))];
+}
+
+// ---------------------------------------------------------------- stats
+
+export interface FocusStats {
+  /** Focused hours per week (oldest first), the current week last. */
+  weeks: { weekKey: string; hours: number }[];
+  longestWindow: number;
+  /** The longest chain, in windows and in focused minutes. */
+  longestChain: { windows: number; minutes: number };
+  averageWindow: number;
+}
+
+export function focusStats(state: AppState, now: Date, count = 12): FocusStats {
+  const ended = [...state.focusWindows.values()].filter((w) => w.endAt !== null);
+  const thisWeek = weekKeyOf(dayKeyOf(now));
+  const weeks = Array.from({ length: count }, (_, i) => addDays(thisWeek, -7 * (count - 1 - i))).map((weekKey) => ({
+    weekKey,
+    hours: ended.filter((w) => w.weekKey === weekKey).reduce((sum, w) => sum + windowMinutes(w, now), 0) / 60,
+  }));
+  let longestChain = { windows: 0, minutes: 0 };
+  for (const weekKey of new Set(ended.map((w) => w.weekKey))) {
+    let run = { windows: 0, minutes: 0 };
+    for (const d of windowDamage(ended.filter((w) => w.weekKey === weekKey), now)) {
+      run = d.chain === 0 ? { windows: 1, minutes: d.minutes } : { windows: run.windows + 1, minutes: run.minutes + d.minutes };
+      if (run.windows > longestChain.windows || (run.windows === longestChain.windows && run.minutes > longestChain.minutes)) longestChain = run;
+    }
+  }
+  const minutes = ended.map((w) => windowMinutes(w, now));
+  return {
+    weeks,
+    longestWindow: Math.max(0, ...minutes),
+    longestChain,
+    averageWindow: minutes.length ? minutes.reduce((a, b) => a + b, 0) / minutes.length : 0,
+  };
 }
 
 // ---------------------------------------------------------------- logging focus

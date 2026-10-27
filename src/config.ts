@@ -1,5 +1,7 @@
 // Every tunable number in the game lives here.
 
+import type { AgonyModifier } from './types';
+
 export const EVENTS = {
   /** Scales the Sparks and Shards of every event's rewards (not daily tasks), to tune overall pacing in one place. */
   rewardMultiplier: 1.0,
@@ -236,6 +238,31 @@ export const MONUMENTAL = {
     { share: 0.75, fraction: 0.5 },
     { share: 0.5, fraction: 0.25 },
   ] as readonly { share: number; fraction: number }[],
+  /** Agony Mode: the tier above the ladder, unlocked by first defeating Akrasia (Tier 11). */
+  agonyTier: 12,
+  agony: { hours: 25, sparks: 3_000, shards: 10 },
+  /**
+   * One is rolled each Agony week (never the same as the week before). Each sets only the rules it
+   * changes; add more here. Moderately harder, never brutal.
+   */
+  modifiers: [
+    { id: 'enraged', name: 'Enraged', text: 'Windows under 20 minutes deal no damage.', minWindowMinutes: 20 },
+    { id: 'fortified', name: 'Fortified', text: 'Chains continue only if the gap is 10 minutes or less.', chainGapMinutes: 10 },
+    { id: 'dampened', name: 'Dampened', text: 'The chain multiplier is capped at 1.25×.', chainCap: 1.25 },
+    {
+      id: 'regenerating',
+      name: 'Regenerating',
+      text: 'On each workday (not a day off) with under 60 damage dealt, it heals 5% of its max HP at the 4 AM rollover.',
+      regen: { minDamage: 60, healShare: 0.05 },
+    },
+    { id: 'exposed', name: 'Exposed', text: 'Boss HP +15%, but deep-focus crits deal +50% instead of +25%.', hpMultiplier: 1.15, critBonus: 0.5 },
+  ] as AgonyModifier[],
+  /** One-time rewards. */
+  firstDefeatSelectors: [3, 6, 9] as readonly number[],
+  akrasia: { selector: 5 as const, title: 'Monument Breaker', theme: 'monolith' },
+  allAgony: { selector: 5 as const, title: 'Agony Unbound' },
+  /** A 5★ selector every this many Agony victories. */
+  agonyVictoriesEvery: 10,
 } as const;
 
 export const SCHEMA_VERSION = 7;
