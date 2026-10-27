@@ -14,15 +14,18 @@ import type {
   Rarity,
   Settings,
   TemplateTask,
+  MealRating,
+  PrepKind,
 } from '../types';
 import { ActionError, done, type ActionResult } from './errors';
 import { requireAwake } from './hibernation';
+import { mealStamp, settleProvisions, stampWorth, taskPrepLog, taskPrepLogs, taskStamps } from './provisions';
 import { taskFitnessEntries, taskFitnessEntry, wouldCount } from './event';
 import { pickIndex, rollRarity, type Rng } from './gacha';
 import { newId } from './ids';
 import { targetPoints } from './rank';
 import { bucketValues, rates, taskValues } from './rewards';
-import { getMeta, put, sortByOrder } from './state';
+import { balances, getMeta, put, sortByOrder, withChanges } from './state';
 import {
   BUCKET_LABELS,
   bucketDayType,
@@ -41,15 +44,7 @@ function ledger(entry: Omit<LedgerEntry, 'id'>): Change {
 
 // ---------------------------------------------------------------- derived data
 
-export function balances(state: AppState): { sparks: number; shards: number } {
-  let sparks = 0;
-  let shards = 0;
-  for (const e of state.ledger.values()) {
-    if (e.currency === 'sparks') sparks += e.amount;
-    else shards += e.amount;
-  }
-  return { sparks, shards };
-}
+export { balances } from './state';
 
 /** How many of each indulgence I hold: won + bought + chosen with selectors − redeemed. */
 export function inventory(state: AppState): Map<string, number> {
@@ -113,6 +108,8 @@ export function buildDay(state: AppState, key: string, now: Date): DayRecord {
     completedAt: null,
     onTime: null,
     fitness: t.fitness ?? null,
+    meal: t.meal ?? false,
+    prep: t.prep ?? null,
   }));
   const buckets: DayBucket[] = bucketsFor(dayType).map((id) => {
     const weight = todays.filter((t) => t.bucket === id).reduce((sum, t) => sum + t.weight, 0);
@@ -203,16 +200,22 @@ export interface CompleteResult {
   perfect: number;
   /** Fitness points the task logged (0 if untagged, or an activity past the weekly cap). */
   fitness: number;
+  /** A meal's stamp: what it's worth now, or held while the supply line is down. */
+  stamp: { value: number; held: boolean } | null;
+  /** Prep step logged, and Contingency Provisions cards it filled. */
+  prep: PrepKind | null;
+  cards: number;
 }
 
-export function completeTask(state: AppState, taskId: string, now: Date): ActionResult<CompleteResult> {
+/** Checks a task off. A meal is rated on plan unless `rating` says otherwise. */
+export function completeTask(state: AppState, taskId: string, now: Date, rating: MealRating = 'on'): ActionResult<CompleteResult> {
   requireAwake(state, now, 'check off tasks');
   const day = requireToday(state, now);
   const task = findTask(day, taskId);
   if (task.completedAt) throw new ActionError('Already done.');
   const onTime = isOnTime(now, day.id, task.deadline);
   const at = now.toISOString();
-  const updated = withTask(day, { ...task, completedAt: at, onTime });
+  const updated = withTask(day, { ...task, completedAt: at, onTime, ...(task.meal ? { mealRating: rating } : {}) });
   const label = BUCKET_LABELS[task.bucket];
   const base = { at, currency: 'sparks' as const, dayKey: day.id };
   const changes: Change[] = [
@@ -229,11 +232,21 @@ export function completeTask(state: AppState, taskId: string, now: Date): Action
     cleared: 0,
     perfect: 0,
     fitness: 0,
+    stamp: null,
+    prep: null,
+    cards: 0,
   };
   const fitness = taskFitnessEntry(day, task, at);
   if (fitness) {
     if (wouldCount(state, fitness.weekKey, fitness.type)) result.fitness = fitness.points;
     changes.push(put('fitness', fitness));
+  }
+  const stamp = mealStamp(day, task, rating, at);
+  if (stamp) changes.push(put('stamps', stamp));
+  const prep = taskPrepLog(day, task, at);
+  if (prep) {
+    changes.push(put('prepLogs', prep));
+    result.prep = prep.kind;
   }
   const before = bucketStatus(day, task.bucket);
   const after = bucketStatus(updated, task.bucket);
@@ -257,7 +270,31 @@ export function completeTask(state: AppState, taskId: string, now: Date): Action
       );
     }
   }
-  return done(changes, result);
+  const settled = settleProvisions(state, changes, now);
+  result.cards = settled.cards;
+  if (stamp) {
+    const worth = stampWorth(withChanges(state, settled.changes), stamp);
+    result.stamp = { value: worth.value, held: !worth.counted };
+  }
+  return done(settled.changes, result);
+}
+
+/** Changes a checked-off meal's rating, the same day only. */
+export function setMealRating(state: AppState, taskId: string, rating: MealRating, now: Date): ActionResult<{ cards: number }> {
+  const day = requireToday(state, now);
+  const task = findTask(day, taskId);
+  if (!task.meal || !task.completedAt) throw new ActionError('Only a checked-off meal can be rated.');
+  if ((task.mealRating ?? 'on') === rating) return done([], { cards: 0 });
+  if (rating === 'on') requireAwake(state, now, 'rate meals');
+  const changes: Change[] = [put('days', withTask(day, { ...task, mealRating: rating }))];
+  if (rating === 'on') {
+    const stamp = mealStamp(day, task, 'on', now.toISOString());
+    if (stamp) changes.push(put('stamps', stamp));
+  } else {
+    for (const s of taskStamps(state, day.id, task.id)) changes.push({ store: 'stamps', op: 'delete', id: s.id });
+  }
+  const settled = settleProvisions(state, changes, now);
+  return done(settled.changes, { cards: settled.cards });
 }
 
 export function undoTask(state: AppState, taskId: string, now: Date): ActionResult<{ refunded: number }> {
@@ -278,7 +315,7 @@ export function undoTask(state: AppState, taskId: string, now: Date): ActionResu
   const at = now.toISOString();
   const base = { at, currency: 'sparks' as const, reason: 'undo' as const, dayKey: day.id };
   const changes: Change[] = [
-    put('days', withTask(day, { ...task, completedAt: null, onTime: null })),
+    put('days', withTask(day, { ...task, completedAt: null, onTime: null, ...(task.meal ? { mealRating: null } : {}) })),
     ledger({ ...base, amount: -taskAmount, note: `Undo: ${task.name}`, taskId }),
   ];
   if (bucketAmount > 0) {
@@ -294,7 +331,9 @@ export function undoTask(state: AppState, taskId: string, now: Date): ActionResu
   for (const entry of taskFitnessEntries(state, day.id, task.id)) {
     changes.push({ store: 'fitness', op: 'delete', id: entry.id });
   }
-  return done(changes, { refunded: amount });
+  for (const s of taskStamps(state, day.id, task.id)) changes.push({ store: 'stamps', op: 'delete', id: s.id });
+  for (const l of taskPrepLogs(state, day.id, task.id)) changes.push({ store: 'prepLogs', op: 'delete', id: l.id });
+  return done(settleProvisions(state, changes, now).changes, { refunded: amount });
 }
 
 /** What a one-off task is worth on a given day (a weight-1 task at that day's rate). */
@@ -485,6 +524,8 @@ export function saveTemplateTask(state: AppState, input: TemplateTaskInput): Act
     weight: input.weight,
     order,
     fitness: input.fitness ?? null,
+    meal: input.meal ?? false,
+    prep: input.prep ?? null,
   };
   return done([put('templateTasks', task)], undefined);
 }

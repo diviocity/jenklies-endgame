@@ -251,6 +251,7 @@ export function markReportsSeen(state: AppState): ActionResult {
   const changes = [
     ...[...state.eventWeeks.values()].filter((w) => !w.seen).map((w) => put('eventWeeks', { ...w, seen: true })),
     ...[...state.depotWeeks.values()].filter((w) => !w.seen).map((w) => put('depotWeeks', { ...w, seen: true })),
+    ...[...state.provisionWeeks.values()].filter((w) => !w.seen).map((w) => put('provisionWeeks', { ...w, seen: true })),
   ];
   return done(changes, undefined);
 }

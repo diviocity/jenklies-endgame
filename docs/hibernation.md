@@ -24,17 +24,18 @@ The rules are in `src/logic/hibernation.ts`; the page is **More → Hibernation*
 - A banner sits under the top bar on every screen, with **Wake up**, and the app is dimmed.
 - **Today:** no tasks due. Tasks can't be checked off.
 - **Frontier Expedition:** logging is off, and the map doesn't move (it catches up after waking).
+- **Contingency Provisions:** no meals are due and prep logging waits; cards filled while away are paid on waking.
 - **Salvage Exchange:** stage changes wait until you wake up, so their once-only rewards are never lost or earned while away. Adding and editing items still works.
 - **Spending** (pulls, the shop, redeeming, selectors) still works.
 - **Weekly report:** held back until you wake. If the latest week was skipped, a short **Welcome back** summary replaces it.
 
 ## Effect on weekly resets
 
-| Hibernated days in the week | Frontier Expedition | Salvage Exchange |
-|---|---|---|
-| 0 | normal | normal |
-| 1–3 | prorated by active days ÷ 7: decay, the weak-week threshold, weekly reward thresholds and the rank panel's target | normal |
-| 4 or more | skipped: no RP update, no decay, no weekly reward, weak-week streak unchanged | no weekly mission |
+| Hibernated days in the week | Frontier Expedition | Salvage Exchange | Contingency Provisions |
+|---|---|---|---|
+| 0 | normal | normal | normal |
+| 1–3 | prorated by active days ÷ 7: decay, the weak-week threshold, weekly reward thresholds and the rank panel's target | normal | supply check as normal; the 85% counts active days only |
+| 4 or more | skipped: no RP update, no decay, no weekly reward, weak-week streak unchanged | no weekly mission | no supply check or ration report; held stamps count instead of expiring |
 
 - **Featured lots:** age tags and the 3-day fresh window count only active days. Open slots never refill while hibernating; they fill when you wake up.
 - **Expedition rank history** shows skipped weeks as hibernated bars.

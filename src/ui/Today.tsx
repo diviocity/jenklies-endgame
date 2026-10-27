@@ -6,15 +6,16 @@ import {
   dayTotals,
   oneOffValues,
   removeOneOff,
+  setMealRating,
   today,
   undoTask,
 } from '../logic/actions';
 import { isHibernating } from '../logic/hibernation';
 import { BUCKET_LABELS, deadlineAt, formatDayKey, formatMinutes, formatTime, inputToMinutes } from '../logic/time';
-import { FITNESS } from '../config';
+import { FITNESS, PROVISIONS } from '../config';
 import { play } from '../sound';
 import { run, useStore } from '../store';
-import type { BucketId, DayBucket, DayRecord, DayTask } from '../types';
+import type { BucketId, DayBucket, DayRecord, DayTask, MealRating } from '../types';
 import { Amount, confirmDialog, Empty, fmt, names, report, Sheet, succeeded, toast, useNow, useSaving } from './common';
 import { wake } from './Hibernation';
 
@@ -153,14 +154,26 @@ function BucketReward({ status, now, day }: { status: ReturnType<typeof bucketSt
   );
 }
 
+/** Announces Contingency Provisions cards filled (or unfilled by a same-day change). */
+function cardToast(cards: number) {
+  const { sparksName, shardsName } = names();
+  if (cards > 0) {
+    play('clear');
+    toast(`Provisions card filled! +${fmt(PROVISIONS.card.sparks * cards)} ${sparksName} · +${PROVISIONS.card.shards * cards} ${shardsName}`, 'good');
+  } else if (cards < 0) toast('Provisions card unfilled; its reward was taken back');
+}
+
 function TaskRow({ task, bucketDeadline }: { task: DayTask; bucketDeadline: number }) {
   const { sparksName } = names();
-  const complete = async () => {
+  const complete = async (as: MealRating) => {
     play('complete');
-    const result = report(await run((s, now) => completeTask(s, task.id, now)));
+    const result = report(await run((s, now) => completeTask(s, task.id, now, as)));
     if (!result) return;
     const fitness = result.fitness ? ` · +${result.fitness} FP` : '';
-    toast(`+${result.earned} ${sparksName}${result.onTime ? ' · on time' : ''}${fitness}`, 'good');
+    const stamp = result.stamp ? (result.stamp.held ? ' · stamp held' : ` · +${result.stamp.value} ${result.stamp.value === 1 ? 'stamp' : 'stamps'}`) : '';
+    const prep = result.prep ? ` · ${result.prep === 'shopping' ? 'shopping' : 'cooking'} logged` : '';
+    toast(`+${result.earned} ${sparksName}${result.onTime ? ' · on time' : ''}${fitness}${stamp}${prep}`, 'good');
+    cardToast(result.cards);
     if (result.cleared) {
       play('clear');
       const label = BUCKET_LABELS[task.bucket];
@@ -182,7 +195,15 @@ function TaskRow({ task, bucketDeadline }: { task: DayTask; bucketDeadline: numb
     if (ok) report(await run((s, now) => removeOneOff(s, task.id, now)));
   };
 
+  const rate = async (next: MealRating) => {
+    const result = report(await run((s, now) => setMealRating(s, task.id, next, now)));
+    if (result === undefined) return;
+    toast(next === 'on' ? 'Rated on plan' : 'Rated off plan · no stamp');
+    cardToast(result.cards);
+  };
+
   const done = !!task.completedAt;
+  const rating = task.mealRating ?? 'on';
   return (
     <li class={`task ${done ? 'done' : ''}`}>
       <button
@@ -190,7 +211,7 @@ function TaskRow({ task, bucketDeadline }: { task: DayTask; bucketDeadline: numb
         role="checkbox"
         aria-checked={done}
         aria-label={done ? `${task.name}, done` : `Complete ${task.name}`}
-        onClick={done ? undefined : complete}
+        onClick={done ? undefined : () => complete('on')}
         disabled={done}
       >
         <span class="box" aria-hidden="true">
@@ -211,20 +232,38 @@ function TaskRow({ task, bucketDeadline }: { task: DayTask; bucketDeadline: numb
               +{task.base} <span class="bonus">+{task.bonus} on time</span>
               {task.deadline !== bucketDeadline && <> · by {formatMinutes(task.deadline)}</>}
               {task.fitness && <span class="fp"> · +{FITNESS.points[task.fitness]} FP</span>}
+              {task.meal && <span class="meal-tag"> · meal</span>}
+              {task.prep && <span class="meal-tag"> · {task.prep === 'shopping' ? 'shopping' : 'cooking'}</span>}
             </span>
           )}
         </span>
       </button>
+      {done && task.meal && (
+        <button
+          class={`mini rating ${rating}`}
+          aria-label={`${task.name}: ${rating === 'on' ? 'on plan' : 'off plan'}. Tap to change.`}
+          onClick={() => rate(rating === 'on' ? 'off' : 'on')}
+        >
+          {rating === 'on' ? 'On plan' : 'Off plan'}
+        </button>
+      )}
       {done ? (
         <button class="mini" onClick={undo}>
           Undo
         </button>
       ) : (
-        task.oneOff && (
-          <button class="mini" aria-label={`Remove ${task.name}`} onClick={remove}>
-            ✕
-          </button>
-        )
+        <>
+          {task.meal && (
+            <button class="mini off-plan" aria-label={`${task.name}: done, off plan`} onClick={() => complete('off')}>
+              Off plan
+            </button>
+          )}
+          {task.oneOff && (
+            <button class="mini" aria-label={`Remove ${task.name}`} onClick={remove}>
+              ✕
+            </button>
+          )}
+        </>
       )}
     </li>
   );

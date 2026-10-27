@@ -6,6 +6,7 @@ import { dayKeyOf, daysBetween, formatDayKey } from '../logic/time';
 import { frontier } from '../logic/event';
 import { describeReward, REGIONS } from '../logic/expedition';
 import { activeHibernation } from '../logic/hibernation';
+import { provisionsAlert } from '../logic/provisions';
 import { play } from '../sound';
 import { isReady, onExpeditionClaims, useStore } from '../store';
 import { Bag } from './Bag';
@@ -120,6 +121,7 @@ export function App() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
   const hibernation = isReady() ? activeHibernation(state, now) : null;
+  const supplyDown = isReady() && provisionsAlert(state, now).down;
   useEffect(() => {
     document.documentElement.toggleAttribute('data-hibernating', !!hibernation);
   }, [!!hibernation]);
@@ -179,6 +181,7 @@ export function App() {
             {t.icon}
             <span>{t.label}</span>
             {t.id === 'more' && due && <i class="dot" aria-label="Backup due" />}
+            {t.id === 'events' && supplyDown && <i class="dot" aria-label="Supply line down" />}
           </a>
         ))}
       </nav>

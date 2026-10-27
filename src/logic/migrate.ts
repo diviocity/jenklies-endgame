@@ -1,8 +1,9 @@
 import { FITNESS, SCHEMA_VERSION } from '../config';
 import type { AppState, Change } from '../types';
 import { payWeek, taskFitnessEntry } from './event';
-import { fitnessTagFor } from './seed';
-import { getMeta, put } from './state';
+import { mealStamp, taskPrepLog } from './provisions';
+import { fitnessTagFor, mealTagFor, prepTagFor } from './seed';
+import { getMeta, put, withChanges } from './state';
 import { dayKeyOf } from './time';
 
 /**
@@ -14,10 +15,12 @@ export function migrate(state: AppState, now: Date): Change[] {
   if (meta.schemaVersion >= SCHEMA_VERSION) return [];
   const changes: Change[] = [];
 
+  // Each step sees the data as the steps before it left it.
   if (meta.schemaVersion < 2) changes.push(...toVersion2(state, now));
-  if (meta.schemaVersion < 3) changes.push(...toVersion3(state, now));
+  if (meta.schemaVersion < 3) changes.push(...toVersion3(withChanges(state, changes), now));
   // Version 4 adds the Salvage Exchange, and version 5 hibernation. Their stores start empty,
   // so there's nothing to convert.
+  if (meta.schemaVersion < 6) changes.push(...toVersion6(withChanges(state, changes), now));
 
   changes.push(
     put('meta', {
@@ -72,4 +75,36 @@ function toVersion2(state: AppState, now: Date): Change[] {
  */
 function toVersion3(state: AppState, now: Date): Change[] {
   return [...state.eventWeeks.values()].filter((w) => w.rewardSparks === undefined).flatMap((w) => payWeek(w, now));
+}
+
+/**
+ * Version 6 adds Contingency Provisions: tag the meal and prep template tasks, tag them in
+ * today's snapshot too, and stamp or log any of them already done today.
+ */
+function toVersion6(state: AppState, now: Date): Change[] {
+  const changes: Change[] = [];
+  const tags = new Map<string, { meal: boolean; prep: ReturnType<typeof prepTagFor> }>();
+  for (const task of state.templateTasks.values()) {
+    const tag = { meal: task.meal ?? mealTagFor(task.name), prep: task.prep ?? prepTagFor(task.name) };
+    tags.set(task.id, tag);
+    if (task.meal !== tag.meal || task.prep !== tag.prep) changes.push(put('templateTasks', { ...task, ...tag }));
+  }
+  const today = state.days.get(dayKeyOf(now));
+  if (today) {
+    const tasks = today.tasks.map((t) => {
+      const tag = t.templateTaskId ? tags.get(t.templateTaskId) : undefined;
+      if (!tag || t.meal !== undefined) return t;
+      return { ...t, ...tag, ...(tag.meal && t.completedAt ? { mealRating: 'on' as const } : {}) };
+    });
+    const day = { ...today, tasks };
+    changes.push(put('days', day));
+    for (const t of tasks) {
+      if (!t.completedAt) continue;
+      const stamp = mealStamp(day, t, 'on', t.completedAt);
+      if (stamp) changes.push(put('stamps', stamp));
+      const log = taskPrepLog(day, t, t.completedAt);
+      if (log) changes.push(put('prepLogs', log));
+    }
+  }
+  return changes;
 }

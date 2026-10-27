@@ -15,6 +15,10 @@ const ADDED_IN: Partial<Record<StoreName, number>> = {
   depotWeeks: 4,
   depot: 4,
   hibernations: 5,
+  prepLogs: 6,
+  stamps: 6,
+  provisionWeeks: 6,
+  provisions: 6,
 };
 
 export const APP_ID = 'jenklies-endgame';
