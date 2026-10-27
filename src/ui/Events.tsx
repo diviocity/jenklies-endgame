@@ -28,26 +28,28 @@ function EventList() {
   return (
     <div class="page">
       <PageTitle eyebrow="// operations" title="Events" />
-      <a class="event-card panel" href="#/events/frontier">
-        <span class="event-art" aria-hidden="true">
-          <i />
-          <i />
-          <i />
-        </span>
-        <span class="event-copy">
-          <span class="eyebrow">permanent · fitness</span>
-          <b>Frontier Expedition</b>
-          {status && (
-            <small class="mono">
-              Rank {status.rank} · {fmt(status.weekPoints)}/{fmt(status.target)} this week
-            </small>
-          )}
-        </span>
-        <span aria-hidden="true">›</span>
-      </a>
-      <SalvageCard />
-      <ProvisionsCard />
-      <MonumentalCard />
+      <div class="event-list">
+        <a class="event-card panel" href="#/events/frontier">
+          <span class="event-art" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span class="event-copy">
+            <span class="eyebrow">permanent · fitness</span>
+            <b>Frontier Expedition</b>
+            {status && (
+              <small class="mono">
+                Rank {status.rank} · {fmt(status.weekPoints)}/{fmt(status.target)} this week
+              </small>
+            )}
+          </span>
+          <span aria-hidden="true">›</span>
+        </a>
+        <SalvageCard />
+        <ProvisionsCard />
+        <MonumentalCard />
+      </div>
     </div>
   );
 }

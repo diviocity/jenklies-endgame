@@ -2,7 +2,7 @@
 
 A permanent event on the Events tab that turns focused work into a weekly boss fight. It rewards long, unbroken stretches over scattered minutes, and the boss gets tougher as I win. Input is a **Start** tap and an **End** tap.
 
-**Status:** Phase 1 is built: focus windows, damage, the ladder (Tiers 1–11), days off, hibernation and weekly rewards. Phase 2 adds Agony Mode and its modifiers, the one-time rewards (selectors, the "Monument Breaker" and "Agony Unbound" titles and the Monolith theme), the Bestiary and the stats.
+**Status:** Built. Phase 1 added focus windows, damage, the ladder (Tiers 1–11), days off, hibernation and weekly rewards; phase 2 added Agony Mode and its modifiers, the one-time rewards (selectors, the "Monument Breaker" and "Agony Unbound" titles and the Monolith theme), the Bestiary and the stats.
 
 Every number lives in `src/config.ts` (`MONUMENTAL`). The rules are in `src/logic/monumental.ts` and the screen is `src/ui/Monumental.tsx`.
 
@@ -60,6 +60,22 @@ Every number lives in `src/config.ts` (`MONUMENTAL`). The rules are in `src/logi
 
 Each boss has a one-line flavor description and an original sigil, drawn in code from its name.
 
+### Agony Mode (Tier 12)
+
+- **Unlocks** on the first defeat of Akrasia: the next week is Agony Mode.
+- **Each week** a random boss from Tiers 1–11 appears as its Agony variant (e.g. "Agony Lethargos"), always at 25 hours, with a random modifier. Neither the boss nor the modifier is the same as the week before.
+- **Ladder rules still apply:** a defeat keeps Agony Mode; two escapes in a row drop back to Tier 11, and Akrasia has to be beaten again to return.
+
+| Modifier | Effect |
+|---|---|
+| Enraged | windows under 20 minutes deal no damage |
+| Fortified | chains continue only if the gap is 10 minutes or less |
+| Dampened | the chain multiplier is capped at 1.25× |
+| Regenerating | each workday (not a day off or hibernated) with under 60 damage dealt heals the boss 5% of its max HP at that day's 4 AM rollover. Healing never takes damage below zero, and a defeated boss stays down |
+| Exposed | boss HP +15%, but deep-focus crits deal +50% instead of +25% |
+
+Modifiers are a list in `MONUMENTAL.modifiers`; each sets only the rules it changes (`minWindowMinutes`, `chainGapMinutes`, `chainCap`, `critBonus`, `hpMultiplier`, `regen`), so new ones are easy to add.
+
 ## Rewards (at the reset)
 
 | Result | Reward |
@@ -68,8 +84,25 @@ Each boss has a one-line flavor description and an original sigil, drawn in code
 | Overkill (120%+ of HP) | an extra 500 Sparks + 2 Shards |
 | Escaped with 75%+ dealt | half the defeat reward |
 | Escaped with 50–74% | a quarter |
+| Defeated, Agony | 3,000 Sparks + 10 Shards |
 
 Partial rewards round Sparks to the nearest 10 and Shards down. The result shows in the weekly report.
+
+### One-time rewards
+
+| Achievement | Reward |
+|---|---|
+| First defeat of Tier 3, Tier 6 and Tier 9 | 4★ selector each |
+| First defeat of Akrasia (Tier 11) | 5★ selector + "Monument Breaker" title + the Monolith theme (obsidian and crimson) |
+| All 11 Agony variants defeated | 5★ selector + "Agony Unbound" title |
+| Every 10 Agony victories | 5★ selector |
+
+They're claimed when the result is recorded (at the reset), or on the next open if any were missed. Titles join the shared list in Settings and are shown under the brand straight away; the theme is picked in Settings.
+
+## Bestiary and stats
+
+- **Bestiary:** an entry for each boss and each Agony variant. Each shows a silhouette until its first defeat, then its name, flavor text, first-defeat date and times defeated. Agony variants appear once Agony Mode opens.
+- **Stats** (information only): focused hours per week (the last 12), the longest window, the longest chain (windows and minutes) and the average window. The ladder panel lists each recent week's tier, boss, modifier and result.
 
 ## Hibernation
 
@@ -81,6 +114,6 @@ Partial rewards round Sparks to the nearest 10 and Shards down. The result shows
 - **Data version 7** (database version 6) adds four stores:
   - `focusWindows`: each window's start, end (null while running), day, week, planned length and whether it was added by hand;
   - `daysOff`: one record per day off;
-  - `bossWeeks`: one per closed week: tier, boss, HP, damage, result, when it fell, next tier and reward;
-  - `monumental`: the ladder (tier, escapes in a row) and this week's boss.
+  - `bossWeeks`: one per closed week: tier, boss, Agony modifier, HP, damage, healing, result, when it fell, next tier and reward. This is also the Agony rotation history and the Bestiary's source;
+  - `monumental`: the ladder (tier, escapes in a row), this week's boss, and the one-time rewards, titles and themes claimed.
 - Existing data needs no changes; older backups import with these empty. Export/import includes everything above, and every reward goes through the currency ledger.

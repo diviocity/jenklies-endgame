@@ -15,6 +15,11 @@ import {
   runningWindow,
   setDayOff,
   startFocus,
+  bestiary,
+  bossName,
+  focusStats,
+  milestonesEarned,
+  modifierOf,
   windowDamage,
   weekWindows,
   type FightStatus,
@@ -37,9 +42,11 @@ function clock(ms: number): string {
 }
 
 /** An original sigil for each boss, drawn from its name: a spiked ring around a core. */
-export function Sigil({ name, size = 72, hidden = false }: { name: string; size?: number; hidden?: boolean }) {
+export function Sigil({ name, size = 72, hidden = false, agony = false }: { name: string; size?: number; hidden?: boolean; agony?: boolean }) {
+  // Agony variants share their boss's shape.
+  const base = name.replace(/^Agony /, '');
   let h = 2166136261;
-  for (const c of name) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+  for (const c of base) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
   const points = 5 + (h % 5);
   const inner = 0.42 + ((h >> 3) % 20) / 100;
   const twist = ((h >> 8) % 360) * (Math.PI / 180);
@@ -54,7 +61,7 @@ export function Sigil({ name, size = 72, hidden = false }: { name: string; size?
     return `${50 + 14 * Math.cos(a)},${50 + 14 * Math.sin(a)}`;
   }).join(' ');
   return (
-    <svg class={`sigil ${hidden ? 'hidden' : ''}`} viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
+    <svg class={`sigil ${hidden ? 'hidden' : agony ? 'agony' : ''}`} viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
       <polygon points={star} class="spikes" />
       {Array.from({ length: rings }, (_, i) => (
         <circle key={i} cx="50" cy="50" r={30 - i * 6} class="ring" />
@@ -74,7 +81,7 @@ export function MonumentalCard() {
   const summary = fight
     ? fight.hp.skipped
       ? `${fight.name} · skipped this week`
-      : `Tier ${fight.fight.tier} · ${fight.name} · ${fight.defeatedAt ? 'defeated' : `${fmt(Math.max(0, fight.hp.hp - fight.damage))} HP left`}`
+      : `${fight.fight.agony ? 'Agony' : `Tier ${fight.fight.tier}`} · ${fight.name} · ${fight.defeatedAt ? 'defeated' : `${fmt(Math.max(0, fight.hp.hp - fight.damage))} HP left`}`
     : `Next boss arrives Monday · Tier ${m?.tier ?? 1}`;
   return (
     <a class="event-card panel monumental-card" href="#/events/monumental">
@@ -178,6 +185,9 @@ export function Monumental() {
       <TodayWindows now={now} />
       <DaysOff now={now} />
       <Ladder />
+      <Honors />
+      <Bestiary />
+      <Stats />
     </div>
   );
 }
@@ -202,13 +212,19 @@ function BossPanel({ fight }: { fight: FightStatus }) {
   return (
     <section class={`panel boss phase-${phase} ${fight.defeatedAt ? 'defeated' : ''}`}>
       <div class="boss-head">
-        <Sigil name={fight.name} />
+        <Sigil name={fight.name} agony={fight.fight.agony} />
         <div>
-          <span class="label">Tier {fight.fight.tier} · phase {phase}</span>
+          <span class="label">{fight.fight.agony ? 'Agony Mode' : `Tier ${fight.fight.tier}`} · phase {phase}</span>
           <h2>{fight.name}</h2>
           <p class="flavor">{fight.flavor}</p>
         </div>
       </div>
+      {fight.modifier && (
+        <p class="modifier">
+          <b>{fight.modifier.name}</b> {fight.modifier.text}
+          {fight.healed > 0 && <span class="mono"> · healed {fight.healed} so far</span>}
+        </p>
+      )}
       {fight.defeatedAt && <div class="defeated-stamp">DEFEATED</div>}
       <div class="hp-bar" role="progressbar" aria-valuenow={left} aria-valuemin={0} aria-valuemax={hp.hp} aria-label={`${fight.name}: ${left} of ${hp.hp} HP`}>
         <i class="hp" style={{ width: `${pct * 100}%` }} />
@@ -460,17 +476,22 @@ function Ladder() {
   const state = useStore();
   const m = monumental(state);
   if (!m) return null;
-  const weeks = [...state.bossWeeks.values()].sort((a, b) => (a.id < b.id ? 1 : -1)).slice(0, 6);
-  const next = bossOf(Math.min(MONUMENTAL.tiers.length, m.tier + 1) - 1);
+  const weeks = [...state.bossWeeks.values()].sort((a, b) => (a.id < b.id ? 1 : -1)).slice(0, 12);
+  const agony = m.tier >= MONUMENTAL.agonyTier;
+  const up = agony ? 'Agony Mode again' : m.tier === MONUMENTAL.tiers.length ? 'Agony Mode' : `Tier ${m.tier + 1}, ${bossOf(m.tier).name}`;
+  const here = agony ? 'Agony Mode' : `Tier ${m.tier}`;
+  // A second escape in a row drops a tier (never below 1); a first one changes nothing.
+  const down = m.escapes === 0 ? `you stay on ${here}` : m.tier > 1 ? `you drop to Tier ${m.tier - 1}` : 'you stay on Tier 1';
   return (
     <section class="panel ladder">
       <h3 class="section-label">Ladder</h3>
       <p class="mono small">
-        Next week: Tier {m.tier}
-        {m.escapes > 0 && ` · ${m.escapes} escape in a row (another drops a tier)`}
+        This week: {agony ? 'Agony Mode' : `Tier ${m.tier}`}
+        {m.escapes > 0 && ` · ${m.escapes} escape in a row`}
       </p>
       <p class="hint small">
-        Defeat a boss to face the next tier ({m.tier < MONUMENTAL.tiers.length ? next.name : 'the top of the ladder'}); escape twice in a row and you drop one.
+        Defeat it and next week is {up}. Escape and {down}.
+        {agony && ' Two escapes in a row send you back to Akrasia (Tier 11).'}
       </p>
       {weeks.length > 0 && (
         <ul class="ladder-list mono">
@@ -478,7 +499,8 @@ function Ladder() {
             <li key={w.id}>
               <span>{keyToDate(w.id).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
               <span class="grow">
-                T{w.tier} {bossOf(w.boss).name}
+                {w.agony ? 'AG' : `T${w.tier}`} {bossName(w.boss, w.agony)}
+                {w.modifier && <small class="muted"> · {modifierOf(w.modifier)?.name}</small>}
               </span>
               <b class={w.result}>{w.result}</b>
             </li>
@@ -489,3 +511,114 @@ function Ladder() {
   );
 }
 
+
+/** The one-time rewards: what's been earned and what's left. */
+function Honors() {
+  const state = useStore();
+  const m = monumental(state);
+  if (!m) return null;
+  const claimed = new Set(m.milestones ?? []);
+  const earned = milestonesEarned([...state.bossWeeks.values()]).filter((x) => claimed.has(x.id));
+  const agonyWins = [...state.bossWeeks.values()].filter((w) => w.agony && w.result === 'defeated');
+  const variants = new Set(agonyWins.map((w) => w.boss)).size;
+  const fixed = [
+    ...MONUMENTAL.firstDefeatSelectors.map((t) => ({ id: `first-${t}`, text: `First Tier ${t} defeat · 4★ selector` })),
+    { id: 'akrasia', text: `First Akrasia defeat · 5★ selector + “${MONUMENTAL.akrasia.title}” + the Monolith theme` },
+    { id: 'agony-all', text: `All ${MONUMENTAL.tiers.length} Agony variants (${variants}/${MONUMENTAL.tiers.length}) · 5★ selector + “${MONUMENTAL.allAgony.title}”` },
+  ];
+  const every = MONUMENTAL.agonyVictoriesEvery;
+  const nextAgony = (Math.floor(agonyWins.length / every) + 1) * every;
+  return (
+    <section class="panel works-honors">
+      <h3 class="section-label">One-time rewards</h3>
+      <ul class="milestone-list">
+        {fixed.map((f) => (
+          <li key={f.id} class={claimed.has(f.id) ? 'done' : ''}>
+            <span class="mono">{claimed.has(f.id) ? '✓' : '○'}</span> {f.text}
+          </li>
+        ))}
+        <li>
+          <span class="mono">○</span> Every {every} Agony victories · 5★ selector ({agonyWins.length}/{nextAgony})
+        </li>
+      </ul>
+      {earned.some((x) => x.id.startsWith('agony-') && x.id !== 'agony-all') && (
+        <p class="mono small muted">
+          Agony victory selectors earned: {earned.filter((x) => /^agony-\d+$/.test(x.id)).length}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function Bestiary() {
+  const state = useStore();
+  const entries = bestiary(state);
+  const met = entries.filter((e) => e.defeats > 0).length;
+  const agonyOpen = entries.some((e) => e.agony && e.defeats > 0) || (monumental(state)?.tier ?? 1) >= MONUMENTAL.agonyTier;
+  const shown = agonyOpen ? entries : entries.filter((e) => !e.agony);
+  return (
+    <details class="panel bestiary">
+      <summary class="section-label">
+        Bestiary · {met}/{agonyOpen ? entries.length : MONUMENTAL.tiers.length}
+      </summary>
+      <ul class="bestiary-grid">
+        {shown.map((e) => (
+          <li key={`${e.boss}-${e.agony}`} class={e.defeats ? 'known' : ''}>
+            <Sigil name={e.name} size={56} hidden={!e.defeats} agony={e.agony} />
+            <b>{e.defeats ? e.name : '???'}</b>
+            {e.defeats ? (
+              <>
+                <small class="flavor">{e.flavor}</small>
+                <small class="mono muted">
+                  First defeated {new Date(e.firstDefeat!).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · ×{e.defeats}
+                </small>
+              </>
+            ) : (
+              <small class="mono muted">{e.agony ? 'Agony variant' : `Tier ${e.boss + 1}`}</small>
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+/** Information only. */
+function Stats() {
+  const state = useStore();
+  const now = useNow();
+  const stats = focusStats(state, now);
+  const max = Math.max(1, ...stats.weeks.map((w) => w.hours));
+  const w = 100 / stats.weeks.length;
+  const hours = (n: number) => `${n.toFixed(1)} h`;
+  return (
+    <section class="panel works-stats">
+      <h3 class="section-label">Stats</h3>
+      <span class="label">Focused hours by week</span>
+      <svg class="trend" viewBox="0 0 100 32" preserveAspectRatio="none" role="img" aria-label={stats.weeks.map((x) => `${x.weekKey}: ${hours(x.hours)}`).join('; ')}>
+        {stats.weeks.map((x, i) => {
+          const h = x.hours > 0 ? Math.max(1, (x.hours / max) * 30) : 0;
+          return <rect key={x.weekKey} class={i === stats.weeks.length - 1 ? 'now' : ''} x={i * w + w * 0.15} y={32 - h} width={w * 0.7} height={h} />;
+        })}
+      </svg>
+      <small class="mono muted">Most in a week: {hours(max === 1 && stats.weeks.every((x) => x.hours === 0) ? 0 : max)}</small>
+      <div class="rank-stats">
+        <div>
+          <span class="label">Longest window</span>
+          <b class="mono">{stats.longestWindow} min</b>
+        </div>
+        <div>
+          <span class="label">Longest chain</span>
+          <b class="mono">
+            {stats.longestChain.windows}
+            <small> · {stats.longestChain.minutes} min</small>
+          </b>
+        </div>
+        <div>
+          <span class="label">Average</span>
+          <b class="mono">{Math.round(stats.averageWindow)} min</b>
+        </div>
+      </div>
+    </section>
+  );
+}

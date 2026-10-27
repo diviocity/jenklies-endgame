@@ -1,6 +1,6 @@
 import { unseenDepotWeeks } from '../logic/depot';
 import { unseenProvisionWeeks } from '../logic/provisions';
-import { bossOf, unseenBossWeeks } from '../logic/monumental';
+import { bossName, modifierOf, unseenBossWeeks } from '../logic/monumental';
 import { describeReward, markReportsSeen, unseenReports, type WeekReport } from '../logic/expedition';
 import { isHibernating, periodLength, periods } from '../logic/hibernation';
 import { addDays, keyToDate } from '../logic/time';
@@ -109,7 +109,8 @@ function BossSummary({ week }: { week?: BossWeek }) {
   const reward = week.rewardSparks + week.rewardShards > 0;
   return (
     <p class="report-line">
-      Boss: {bossOf(week.boss).name} {week.result === 'defeated' ? 'defeated' : 'escaped'} ({pct}% of {week.hp} HP)
+      Boss: {bossName(week.boss, week.agony)}
+      {week.modifier && ` (${modifierOf(week.modifier)?.name})`} {week.result === 'defeated' ? 'defeated' : 'escaped'} ({pct}% of {week.hp} HP)
       {reward && (
         <>
           {' '}

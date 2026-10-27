@@ -5,7 +5,9 @@ import type { ActionResult } from '../src/logic/errors';
 import { scheduleHibernation, startHibernation } from '../src/logic/hibernation';
 import {
   addWindow,
+  bestiary,
   bossHp,
+  chainMultiplier,
   cancelDayOff,
   climb,
   currentFight,
@@ -14,15 +16,23 @@ import {
   editWindow,
   endFocus,
   ensureMonumental,
+  fightStatus,
+  focusStats,
+  milestonesEarned,
+  modifierOf,
   monumental,
   runningWindow,
   setDayOff,
+  spawn,
   startFocus,
   weekReward,
   windowDamage,
 } from '../src/logic/monumental';
 import { applyChanges, emptyState, seedChanges } from '../src/logic/state';
-import type { AppState, FocusWindow } from '../src/types';
+import { put } from '../src/logic/state';
+import { seededRng } from '../src/logic/gacha';
+import { earnedTitles, unlockedThemes } from '../src/logic/honors';
+import type { AppState, BossFight, BossWeek, FocusWindow } from '../src/types';
 
 // Wed Oct 28 2026; Monday Nov 2 and Nov 9 start the next weeks.
 const oct = (day: number, h = 9, m = 0) => new Date(2026, 9, day, h, m);
@@ -216,7 +226,10 @@ describe('the ladder', () => {
     expect(climb(3, 1, 'escaped')).toEqual({ tier: 2, escapes: 0 });
     expect(climb(1, 1, 'escaped')).toEqual({ tier: 1, escapes: 0 });
     expect(climb(3, 1, 'skipped')).toEqual({ tier: 3, escapes: 1 });
-    expect(climb(11, 0, 'defeated').tier).toBe(11);
+    // Defeating Akrasia opens Agony Mode (Tier 12); a defeat keeps it, two escapes drop back to Tier 11.
+    expect(climb(11, 0, 'defeated').tier).toBe(12);
+    expect(climb(12, 0, 'defeated').tier).toBe(12);
+    expect(climb(12, 1, 'escaped')).toEqual({ tier: 11, escapes: 0 });
   });
 
   it('settles each week at the reset: reward, record and the next boss', () => {
@@ -247,5 +260,177 @@ describe('the ladder', () => {
     tick(state, nov(9, 5));
     expect(state.bossWeeks.get('2026-11-02')).toMatchObject({ result: 'skipped', rewardSparks: 0, seen: true });
     expect(monumental(state)).toMatchObject({ tier: 1, escapes: 1 });
+  });
+});
+
+// ---------------------------------------------------------------- phase 2
+
+const agonyFight = (modifier: string, boss = 0): BossFight => ({ weekKey: '2026-11-02', tier: 12, boss, agony: true, modifier });
+
+/** A state on the week of Nov 2 with this fight and these windows. */
+function fightWith(fight: BossFight, windows: [Date, number][]) {
+  const state = setup(nov(2, 5));
+  applyChanges(state, [put('monumental', { ...monumental(state)!, tier: fight.tier, fight })]);
+  for (const [start, minutes] of windows) work(state, start, minutes);
+  return state;
+}
+
+describe('Agony modifiers', () => {
+  it('Enraged: windows under 20 minutes deal no damage', () => {
+    const d = windowDamage([win(nov(2, 8), 19), win(nov(2, 9), 20)], nov(2, 12), modifierOf('enraged'));
+    expect(d.map((w) => w.damage)).toEqual([0, 20]);
+  });
+
+  it('Fortified: chains continue only with a gap of 10 minutes or less', () => {
+    const windows = [win(nov(2, 8), 40), win(nov(2, 8, 52), 40)]; // a 12-minute gap
+    expect(windowDamage(windows, nov(2, 12))[1].chain).toBe(1);
+    expect(windowDamage(windows, nov(2, 12), modifierOf('fortified'))[1].chain).toBe(0);
+  });
+
+  it('Dampened: the chain multiplier is capped at 1.25×', () => {
+    expect(chainMultiplier(2)).toBe(1.5);
+    expect(chainMultiplier(2, modifierOf('dampened'))).toBe(1.25);
+    const d = windowDamage([win(nov(2, 8), 40), win(nov(2, 8, 45), 40), win(nov(2, 9, 30), 40)], nov(2, 12), modifierOf('dampened'));
+    expect(d.map((w) => w.damage)).toEqual([40, 50, 50]);
+  });
+
+  it('Exposed: +15% HP, but crits deal +50%', () => {
+    const state = fightWith(agonyFight('exposed'), []);
+    expect(bossHp(state, agonyFight('exposed'), nov(2, 6)).max).toBe(Math.round(1500 * 1.15));
+    expect(windowDamage([win(nov(2, 8), 90)], nov(2, 12), modifierOf('exposed'))[0].damage).toBe(135);
+  });
+
+  it('Regenerating: each quiet workday heals 5% of max HP at the rollover; a defeated boss stays down', () => {
+    // Monday: 120 damage (no heal). Tuesday: 30 (heals 75 at Wednesday 4 AM). Wednesday: a day off (no heal).
+    const state = fightWith(agonyFight('regenerating'), [
+      [nov(2, 8), 80],
+      [nov(2, 10), 40],
+      [nov(3, 9), 30],
+    ]);
+    run(state, setDayOff(state, '2026-11-04', nov(3, 12)));
+    const status = fightStatus(state, monumental(state)!.fight!, nov(5, 9));
+    expect(status.healed).toBe(75);
+    expect(status.damage).toBe(80 + 40 + 30 - 75);
+    // Thursday and Friday without focus heal again, but never below zero damage: 75 more, not 150.
+    const later = fightStatus(state, monumental(state)!.fight!, nov(7, 9));
+    expect(later).toMatchObject({ healed: 150, damage: 0 });
+  });
+});
+
+describe('Agony Mode', () => {
+  it('rolls a random boss and modifier, never the same as the week before', () => {
+    const rng = seededRng(7);
+    let prev: BossFight | null = null;
+    for (let i = 0; i < 200; i++) {
+      const next = spawn(12, '2026-11-02', prev, rng);
+      expect(next).toMatchObject({ tier: 12, agony: true });
+      expect(next.boss).toBeGreaterThanOrEqual(0);
+      expect(next.boss).toBeLessThan(11);
+      if (prev) {
+        expect(next.boss).not.toBe(prev.boss);
+        expect(next.modifier).not.toBe(prev.modifier);
+      }
+      prev = next;
+    }
+    expect(spawn(5, '2026-11-02', prev, rng)).toEqual({ weekKey: '2026-11-02', tier: 5, boss: 4 });
+  });
+
+  it('opens after defeating Akrasia, and two escapes drop back to Tier 11', () => {
+    const state = fightWith({ weekKey: '2026-11-02', tier: 11, boss: 10 }, []);
+    for (let d = 2; d <= 6; d++) {
+      work(state, nov(d, 8), 180);
+      work(state, nov(d, 11, 5), 180);
+    }
+    tick(state, nov(9, 5));
+    expect(state.bossWeeks.get('2026-11-02')).toMatchObject({ result: 'defeated', nextTier: 12 });
+    const agony = monumental(state)!.fight!;
+    expect(agony).toMatchObject({ tier: 12, agony: true });
+    expect(currentFight(state, nov(9, 6))!.name).toMatch(/^Agony /);
+    tick(state, nov(16, 5));
+    tick(state, nov(23, 5));
+    expect(monumental(state)).toMatchObject({ tier: 11 });
+    expect(monumental(state)!.fight).toMatchObject({ tier: 11, boss: 10 });
+    expect(monumental(state)!.fight!.agony).toBeUndefined();
+  });
+
+  it('pays 3,000 + 10 Shards for an Agony defeat', () => {
+    expect(defeatReward(12)).toEqual({ sparks: 3_000, shards: 10 });
+    expect(weekReward(12, 1_500, 1_500)).toEqual({ sparks: 3_000, shards: 10, result: 'defeated' });
+  });
+});
+
+describe('one-time rewards', () => {
+  const week = (id: number, tier: number, boss: number, agony = false): BossWeek => ({
+    id: `w${id}`,
+    tier,
+    boss,
+    hp: 1,
+    damage: 1,
+    result: 'defeated',
+    defeatedAt: `2026-01-${String((id % 28) + 1).padStart(2, '0')}T12:00:00Z`,
+    nextTier: tier,
+    rewardSparks: 0,
+    rewardShards: 0,
+    closedAt: '',
+    seen: true,
+    ...(agony ? { agony: true } : {}),
+  });
+
+  it('first defeats of Tiers 3, 6 and 9 give 4★ selectors; Akrasia gives a 5★, a title and the theme', () => {
+    const ids = (weeks: BossWeek[]) => milestonesEarned(weeks).map((m) => m.id);
+    expect(ids([week(1, 2, 1)])).toEqual([]);
+    expect(ids([week(1, 3, 2), week(2, 6, 5), week(3, 9, 8)])).toEqual(['first-3', 'first-6', 'first-9']);
+    const akrasia = milestonesEarned([week(1, 11, 10)]).find((m) => m.id === 'akrasia')!;
+    expect(akrasia).toMatchObject({ selector: 5, title: 'Monument Breaker', theme: 'monolith' });
+  });
+
+  it('all 11 Agony variants give a 5★ and “Agony Unbound”, and every 10 Agony victories a 5★', () => {
+    const ten = Array.from({ length: 10 }, (_, i) => week(i, 12, i, true));
+    expect(milestonesEarned(ten).map((m) => m.id)).toEqual(['agony-10']);
+    const all = [...ten, week(10, 12, 10, true)];
+    expect(milestonesEarned(all).find((m) => m.id === 'agony-all')).toMatchObject({ selector: 5, title: 'Agony Unbound' });
+    const thirty = Array.from({ length: 30 }, (_, i) => week(i, 12, i % 11, true));
+    expect(milestonesEarned(thirty).map((m) => m.id)).toEqual(['agony-all', 'agony-10', 'agony-20', 'agony-30']);
+  });
+
+  it('are claimed at the reset, once', () => {
+    const state = fightWith({ weekKey: '2026-11-02', tier: 11, boss: 10 }, []);
+    for (let d = 2; d <= 6; d++) {
+      work(state, nov(d, 8), 180);
+      work(state, nov(d, 11, 5), 180);
+    }
+    tick(state, nov(9, 5));
+    expect(monumental(state)!.milestones).toEqual(['akrasia']);
+    expect(earnedTitles(state)).toEqual(['Monument Breaker']);
+    expect(unlockedThemes(state)).toEqual(['monolith']);
+    expect([...state.selectors.values()].map((s) => s.rarity)).toEqual([5]);
+    tick(state, nov(16, 5));
+    expect([...state.selectors.values()]).toHaveLength(1);
+  });
+});
+
+describe('Bestiary and stats', () => {
+  it('lists every boss and Agony variant, with first-defeat dates and counts', () => {
+    const state = setup();
+    work(state, oct(28, 8), 180);
+    work(state, oct(28, 11, 5), 180);
+    tick(state, nov(2, 5));
+    const entries = bestiary(state);
+    expect(entries).toHaveLength(22);
+    expect(entries[0]).toMatchObject({ name: 'Lethargos', defeats: 1 });
+    expect(entries[0].firstDefeat).not.toBeNull();
+    expect(entries[11]).toMatchObject({ name: 'Agony Lethargos', defeats: 0, firstDefeat: null });
+  });
+
+  it('reports hours per week, the longest window and chain, and the average window', () => {
+    const state = setup();
+    work(state, oct(28, 8), 30);
+    work(state, oct(28, 8, 40), 60); // chain of 2, 90 minutes
+    work(state, oct(28, 13), 120);
+    const stats = focusStats(state, oct(28, 16), 4);
+    expect(stats.weeks.map((w) => w.hours)).toEqual([0, 0, 0, 3.5]);
+    expect(stats.longestWindow).toBe(120);
+    expect(stats.longestChain).toEqual({ windows: 2, minutes: 90 });
+    expect(stats.averageWindow).toBe(70);
   });
 });

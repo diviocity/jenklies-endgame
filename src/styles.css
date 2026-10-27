@@ -1374,6 +1374,13 @@ span.r5 {
 
 /* ---------------------------------------------------------------- events */
 
+/* Every event card is as tall as the tallest one. */
+.event-list {
+  display: grid;
+  grid-auto-rows: 1fr;
+  gap: 14px;
+}
+
 .event-card {
   display: flex;
   align-items: center;
@@ -2818,6 +2825,101 @@ span.r5 {
   gap: 8px;
 }
 
+.sigil.agony .spikes {
+  fill: rgba(255, 40, 60, 0.18);
+  stroke: #ff2a44;
+  filter: drop-shadow(0 0 4px rgba(255, 42, 68, 0.6));
+}
+
+.sigil.agony .core {
+  stroke: #ff2a44;
+}
+
+.modifier {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid #ff2a44;
+  background: rgba(255, 42, 68, 0.08);
+  font-size: 13px;
+}
+
+.modifier b {
+  color: #ff6b7d;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-right: 4px;
+}
+
+.works-honors,
+.works-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.works-honors li:not(.done) {
+  color: var(--muted);
+}
+
+.works-honors li.done .mono {
+  color: var(--ok);
+}
+
+.works-stats .trend rect {
+  fill: var(--danger);
+  opacity: 0.85;
+}
+
+.works-stats .trend rect.now {
+  opacity: 0.5;
+}
+
+.bestiary summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.bestiary summary::before {
+  content: '▸ ';
+}
+
+.bestiary[open] summary::before {
+  content: '▾ ';
+}
+
+.bestiary-grid {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bestiary-grid li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border: 1px solid var(--line);
+  text-align: center;
+}
+
+.bestiary-grid li b {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bestiary-grid li:not(.known) b {
+  color: var(--dim);
+}
+
+.bestiary-grid small {
+  font-size: 11px;
+}
+
 /* The Endgame theme, unlocked by finishing the expedition: midnight blue and gold. */
 :root[data-theme='endgame'] {
   --bg: #080a12;
@@ -2959,6 +3061,52 @@ span.r5 {
 }
 
 :root[data-theme='field'] .btn.primary {
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+}
+
+/* The Monolith theme, unlocked by first defeating Akrasia: obsidian and crimson. */
+:root[data-theme='monolith'] {
+  --bg: #08080a;
+  --bg-2: #0d0d10;
+  --panel: #121216;
+  --panel-2: #19191e;
+  --line: #2a2a31;
+  --line-2: #3d3d47;
+  --muted: #a3a1aa;
+  --dim: #66646d;
+  --accent: #e8414f;
+  --accent-2: #ff8a93;
+  --accent-ink: #0a0a0c;
+}
+
+:root[data-theme='monolith'] .app {
+  background:
+    radial-gradient(120% 55% at 50% -10%, rgba(232, 65, 79, 0.12), transparent 60%),
+    linear-gradient(transparent 0 calc(100% - 1px), rgba(255, 255, 255, 0.03) 0) 0 0 / 100% 24px,
+    linear-gradient(90deg, transparent 0 calc(100% - 1px), rgba(255, 255, 255, 0.03) 0) 0 0 / 24px 100%,
+    var(--bg);
+}
+
+:root[data-theme='monolith'] .panel {
+  border-color: rgba(232, 65, 79, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+:root[data-theme='monolith'] .brand-mark {
+  background: linear-gradient(135deg, #2b2b33, #121216 55%, var(--accent));
+  box-shadow: 0 0 10px rgba(232, 65, 79, 0.45);
+}
+
+:root[data-theme='monolith'] .topbar,
+:root[data-theme='monolith'] .tabbar {
+  background: #060608;
+}
+
+:root[data-theme='monolith'] .tabbar a.on svg {
+  filter: drop-shadow(0 0 4px rgba(232, 65, 79, 0.6));
+}
+
+:root[data-theme='monolith'] .btn.primary {
   background: linear-gradient(180deg, var(--accent-2), var(--accent));
 }
 
