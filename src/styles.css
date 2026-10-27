@@ -713,8 +713,17 @@ span.r5 {
 }
 
 .segmented.dense button {
+  flex: 1 1 auto;
+  padding: 0 8px;
   font-size: 10.5px;
   letter-spacing: 0.03em;
+}
+
+@media (max-width: 360px) {
+  .segmented.dense button {
+    padding: 0 5px;
+    letter-spacing: 0;
+  }
 }
 
 .segmented button.on {
