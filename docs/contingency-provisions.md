@@ -2,7 +2,7 @@
 
 A permanent event on the Events tab that tracks whether I'm eating right **consistently**, with no meal logging or calorie counting. It's built around the two keystone habits my diet depends on, **grocery shopping and Sunday meal prep**. Input stays at one tap per meal, on meal tasks I already check off.
 
-**Status:** Phase 1 is built: meal and prep tags, ratings, the supply line, stamps, cards, the ration report and hibernation. Phase 2 adds lifetime milestones (selectors, titles and the Field Kitchen theme) and the stats.
+**Status:** Built. Phase 1 added meal and prep tags, ratings, the supply line, stamps, cards, the ration report and hibernation; phase 2 added lifetime milestones (selectors, titles and the Field Kitchen theme) and the stats.
 
 Every number lives in `src/config.ts` (`PROVISIONS`). The rules are in `src/logic/provisions.ts` and the screen is `src/ui/Provisions.tsx`.
 
@@ -37,6 +37,22 @@ Every number lives in `src/config.ts` (`PROVISIONS`). The rules are in `src/logi
 - **Weekly ration report:** at each reset, **85% or more** of the week's scheduled meals on plan **and** the supply line up (on time or late) pays **500 Sparks + 5 Shards**. It appears in the weekly report.
   - Scheduled meals are counted on active days only, from the event's first day. A day the app was never opened still counts its template meals, as missed.
 
+### Lifetime milestones (cards filled)
+
+| Cards filled | Reward |
+|---|---|
+| 1 | 1,000 Sparks + "Well Supplied" title |
+| 5 | 4★ selector |
+| 10 | 5★ selector |
+| 25 | "Provisioner" title + the Field Kitchen theme |
+| 50, 75, 100… | 5★ selector each |
+
+- **When they pay:** with the card that reaches them, with a message saying what you got. Selectors go into the Bag.
+- **Undo:** a same-day change that unfills that card takes the milestone back too (its Sparks, selector, title and theme). If the selector has already been opened, the change is refused instead.
+- **Titles** join the shared list in Settings, and a new one is shown under the brand straight away.
+- **The Field Kitchen theme:** olive green and amber, picked in Settings next to the other themes.
+- **Catch-up:** cards filled before milestones existed claim theirs on the next open.
+
 **Pace:**
 
 | Kind of week | Stamps | Cards | Pulls (approx.) |
@@ -46,6 +62,12 @@ Every number lives in `src/config.ts` (`PROVISIONS`). The rules are in `src/logi
 | Prep done late | ~17 | ~0.8 | ~1.5 |
 
 Missing prep is the most expensive mistake by far.
+
+## Stats (information only)
+
+- **On plan by week:** a bar chart of each week's on-plan percentage (the last 11 closed weeks plus this week so far), colored by that week's supply line (on time, late, down or hibernated), with the 85% line.
+- **Supply line history:** how many recent weeks were on time, late or down.
+- **Lifetime:** stamps counted, cards filled and stamps expired.
 
 ## Hibernation
 
@@ -60,7 +82,7 @@ Missing prep is the most expensive mistake by far.
   - `prepLogs`: each shopping or cooking step, the week it supplies, and whether it came from a task or by hand;
   - `stamps`: one per on-plan meal. While its week is open, it counts or is held according to the supply line; when the week closes, it's marked counted (with its value) or expired;
   - `provisionWeeks`: one per closed week: supply status, meals scheduled and on plan, stamps counted and expired, and the ration reward;
-  - `provisions`: the event state (first day, current week, cards filled).
+  - `provisions`: the event state (first day, current week, cards filled, and the milestones, titles and themes earned).
 - Meal ratings live on the day's tasks; template and day tasks gain `meal` and `prep` tags.
 - **Upgrading:** tags the meal and prep tasks in the template and today's tasks, and stamps or logs any already done today. Older backups import the same way.
 - **Export/import** includes everything above. Every reward goes through the currency ledger.

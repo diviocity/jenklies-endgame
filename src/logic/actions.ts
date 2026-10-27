@@ -19,7 +19,7 @@ import type {
 } from '../types';
 import { ActionError, done, type ActionResult } from './errors';
 import { requireAwake } from './hibernation';
-import { mealStamp, settleProvisions, stampWorth, taskPrepLog, taskPrepLogs, taskStamps } from './provisions';
+import { mealStamp, settleProvisions, stampWorth, taskPrepLog, taskPrepLogs, taskStamps, type Milestone as ProvisionsMilestone } from './provisions';
 import { taskFitnessEntries, taskFitnessEntry, wouldCount } from './event';
 import { pickIndex, rollRarity, type Rng } from './gacha';
 import { newId } from './ids';
@@ -205,6 +205,8 @@ export interface CompleteResult {
   /** Prep step logged, and Contingency Provisions cards it filled. */
   prep: PrepKind | null;
   cards: number;
+  /** Contingency Provisions milestones those cards reached. */
+  milestones: ProvisionsMilestone[];
 }
 
 /** Checks a task off. A meal is rated on plan unless `rating` says otherwise. */
@@ -235,6 +237,7 @@ export function completeTask(state: AppState, taskId: string, now: Date, rating:
     stamp: null,
     prep: null,
     cards: 0,
+    milestones: [],
   };
   const fitness = taskFitnessEntry(day, task, at);
   if (fitness) {
@@ -272,6 +275,7 @@ export function completeTask(state: AppState, taskId: string, now: Date, rating:
   }
   const settled = settleProvisions(state, changes, now);
   result.cards = settled.cards;
+  result.milestones = settled.milestones;
   if (stamp) {
     const worth = stampWorth(withChanges(state, settled.changes), stamp);
     result.stamp = { value: worth.value, held: !worth.counted };
@@ -280,11 +284,16 @@ export function completeTask(state: AppState, taskId: string, now: Date, rating:
 }
 
 /** Changes a checked-off meal's rating, the same day only. */
-export function setMealRating(state: AppState, taskId: string, rating: MealRating, now: Date): ActionResult<{ cards: number }> {
+export function setMealRating(
+  state: AppState,
+  taskId: string,
+  rating: MealRating,
+  now: Date,
+): ActionResult<{ cards: number; milestones: ProvisionsMilestone[] }> {
   const day = requireToday(state, now);
   const task = findTask(day, taskId);
   if (!task.meal || !task.completedAt) throw new ActionError('Only a checked-off meal can be rated.');
-  if ((task.mealRating ?? 'on') === rating) return done([], { cards: 0 });
+  if ((task.mealRating ?? 'on') === rating) return done([], { cards: 0, milestones: [] });
   if (rating === 'on') requireAwake(state, now, 'rate meals');
   const changes: Change[] = [put('days', withTask(day, { ...task, mealRating: rating }))];
   if (rating === 'on') {
@@ -294,7 +303,7 @@ export function setMealRating(state: AppState, taskId: string, rating: MealRatin
     for (const s of taskStamps(state, day.id, task.id)) changes.push({ store: 'stamps', op: 'delete', id: s.id });
   }
   const settled = settleProvisions(state, changes, now);
-  return done(settled.changes, { cards: settled.cards });
+  return done(settled.changes, { cards: settled.cards, milestones: settled.milestones });
 }
 
 export function undoTask(state: AppState, taskId: string, now: Date): ActionResult<{ refunded: number }> {

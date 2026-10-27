@@ -15,7 +15,7 @@ export type FitnessType = 'crossfit' | 'pt' | 'workout' | 'activity';
 /** How many of each fitness activity make up a full target week. */
 export type FitnessTarget = Record<FitnessType, number>;
 
-export type ThemeId = 'default' | 'endgame' | 'market';
+export type ThemeId = 'default' | 'endgame' | 'market' | 'field';
 
 export interface Settings {
   deadlines: Record<BucketId, Minutes>;
@@ -26,7 +26,7 @@ export interface Settings {
   shardsName: string;
   /** The Frontier Expedition's target week (missing in data from before the event). */
   fitnessTarget?: FitnessTarget;
-  /** UI theme; 'endgame' is unlocked by finishing the expedition, 'market' by the 20th Salvage Exchange sale. */
+  /** UI theme: 'endgame' (finishing the expedition), 'market' (20th Salvage Exchange sale), 'field' (25th Provisions card). */
   theme?: ThemeId;
 }
 
@@ -124,7 +124,8 @@ export type LedgerReason =
   | 'depot_mission'
   | 'depot_milestone'
   | 'provisions_card'
-  | 'provisions_ration';
+  | 'provisions_ration'
+  | 'provisions_milestone';
 
 export interface LedgerEntry {
   id: string;
@@ -461,6 +462,22 @@ export interface ProvisionsState {
   currentWeek: string;
   /** Cards filled and paid so far. */
   cardsFilled: number;
+  /** Milestones claimed (missing before milestones existed). */
+  milestones?: ProvisionsClaim[];
+  /** Titles and themes earned here. The title shown is kept on the Frontier Expedition's state. */
+  titles?: string[];
+  themes?: string[];
+}
+
+/** A claimed milestone and what it gave, so a same-day undo that unfills its card can take it back. */
+export interface ProvisionsClaim {
+  /** e.g. "cards-1", "cards-50". */
+  id: string;
+  cards: number;
+  ledgerIds: string[];
+  selectorId?: string;
+  /** The title shown before this milestone's title replaced it. */
+  prevTitle?: string | null;
 }
 
 /** A hibernation period: an app-wide pause. Ended periods are read-only. */

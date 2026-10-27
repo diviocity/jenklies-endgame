@@ -4,11 +4,15 @@ import { balances, completeTask, ensureDay, setMealRating, today, undoTask } fro
 import type { ActionResult } from '../src/logic/errors';
 import { ensureEvent } from '../src/logic/event';
 import { startHibernation, wakeUp } from '../src/logic/hibernation';
+import { earnedTitles, unlockedThemes } from '../src/logic/honors';
+import { frontier } from '../src/logic/event';
 import { migrate } from '../src/logic/migrate';
 import {
   cardProgress,
   ensureProvisions,
   logPrep,
+  milestonesThrough,
+  nextMilestone,
   provisions,
   provisionsAlert,
   supplyFor,
@@ -323,5 +327,107 @@ describe('upgrading to version 6', () => {
     expect(today(state, nov(2, 9))!.tasks.find((t) => t.id === breakfast.id)).toMatchObject({ meal: true, mealRating: 'on' });
     expect(state.stamps.size).toBe(1);
     expect(PROVISIONS.stampsPerCard).toBe(21);
+  });
+});
+
+describe('milestones', () => {
+  /** Adds counted stamp value directly, as if from closed weeks. */
+  const bank = (state: AppState, value: number, id = `bank${value}`) =>
+    applyChanges(state, [put('stamps', { id, taskId: id, dayKey: '2026-10-26', weekKey: '2026-10-26', at: oct(26).toISOString(), status: 'counted', value })]);
+  const selectors = (state: AppState) => [...state.selectors.values()].map((s) => `${s.rarity}★ ${s.source}`);
+
+  it('has the agreed thresholds, with a 5★ selector every 25 cards after the 25th', () => {
+    expect(milestonesThrough(100).map((m) => [m.cards, m.sparks, m.selector, m.title, m.theme])).toEqual([
+      [1, 1_000, null, 'Well Supplied', null],
+      [5, 0, 4, null, null],
+      [10, 0, 5, null, null],
+      [25, 0, null, 'Provisioner', 'field'],
+      [50, 0, 5, null, null],
+      [75, 0, 5, null, null],
+      [100, 0, 5, null, null],
+    ]);
+    expect(nextMilestone(0).cards).toBe(1);
+    expect(nextMilestone(25).cards).toBe(50);
+    expect(nextMilestone(60).cards).toBe(75);
+  });
+
+  it('the 1st card pays 1,000 Sparks and “Well Supplied”, shown straight away', () => {
+    const state = setup();
+    const before = balances(state).sparks;
+    bank(state, 21);
+    tick(state, oct(30, 10));
+    expect(provisions(state)!.cardsFilled).toBe(1);
+    expect(balances(state).sparks - before).toBe(PROVISIONS.card.sparks + 1_000);
+    expect(earnedTitles(state)).toEqual(['Well Supplied']);
+    expect(frontier(state)!.activeTitle).toBe('Well Supplied');
+  });
+
+  it('the 5th and 10th cards give 4★ and 5★ selectors; the 25th Provisioner and the Field Kitchen theme', () => {
+    const state = setup();
+    bank(state, 21 * 25);
+    tick(state, oct(30, 10));
+    expect(selectors(state)).toEqual([
+      '4★ Contingency Provisions: 5th card milestone',
+      '5★ Contingency Provisions: 10th card milestone',
+    ]);
+    expect(earnedTitles(state)).toEqual(['Well Supplied', 'Provisioner']);
+    expect(unlockedThemes(state)).toEqual(['field']);
+    expect(frontier(state)!.activeTitle).toBe('Provisioner');
+    bank(state, 21 * 25, 'more');
+    tick(state, oct(30, 11));
+    expect(selectors(state)).toContain('5★ Contingency Provisions: 50th card milestone');
+  });
+
+  it('a same-day undo that unfills a milestone card takes the milestone back too', () => {
+    const state = setup();
+    prepWeekend(state, oct(31), nov(1));
+    for (const d of [2, 3, 4]) eat(state, nov(d, 20));
+    const result = (() => {
+      tick(state, nov(5, 20));
+      const meals = today(state, nov(5, 20))!.tasks.filter((t) => t.meal).slice(0, 2);
+      run(state, completeTask(state, meals[0].id, nov(5, 20)));
+      return run(state, completeTask(state, meals[1].id, nov(5, 20)));
+    })();
+    expect(result.milestones.map((m) => m.id)).toEqual(['cards-1']);
+    const last = today(state, nov(5, 21))!.tasks.filter((t) => t.meal && t.completedAt).pop()!;
+    const before = balances(state).sparks;
+    run(state, undoTask(state, last.id, nov(5, 21)));
+    expect(earnedTitles(state)).toEqual([]);
+    expect(frontier(state)!.activeTitle).toBeNull();
+    expect(provisions(state)!.milestones).toEqual([]);
+    expect(before - balances(state).sparks).toBe(100 + PROVISIONS.card.sparks + 1_000); // the meal was late: 100
+  });
+
+  it('refuses the undo once the milestone’s selector has been opened', () => {
+    const state = setup();
+    bank(state, 21 * 4 + 20); // 4 cards and 20 stamps
+    prepWeekend(state, oct(31), nov(1));
+    tick(state, nov(2, 8));
+    const meal = today(state, nov(2, 8))!.tasks.find((t) => t.meal)!;
+    run(state, completeTask(state, meal.id, nov(2, 8))); // +2: the 5th card
+    const [sel] = [...state.selectors.values()].filter((s) => s.source.includes('5th card'));
+    applyChanges(state, [put('selectors', { ...sel, usedAt: nov(2, 9).toISOString(), indulgenceId: 'x', name: 'x' })]);
+    expect(() => undoTask(state, meal.id, nov(2, 10))).toThrow('already been opened');
+  });
+
+  it('catches up on milestones for cards filled before milestones existed', () => {
+    const state = setup();
+    bank(state, 21);
+    applyChanges(state, [put('provisions', { ...provisions(state)!, cardsFilled: 1, milestones: undefined })]);
+    tick(state, oct(30, 10));
+    expect(provisions(state)!.milestones!.map((c) => c.id)).toEqual(['cards-1']);
+    expect(earnedTitles(state)).toEqual(['Well Supplied']);
+  });
+
+  it('waits while hibernating', () => {
+    const state = setup();
+    run(state, startHibernation(state, null, oct(30, 10)));
+    bank(state, 21);
+    tick(state, oct(30, 11));
+    expect(provisions(state)!.cardsFilled).toBe(0);
+    expect(earnedTitles(state)).toEqual([]);
+    run(state, wakeUp(state, oct(31, 9)));
+    tick(state, oct(31, 9, 1));
+    expect(earnedTitles(state)).toEqual(['Well Supplied']);
   });
 });

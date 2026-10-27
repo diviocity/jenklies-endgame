@@ -2452,8 +2452,15 @@ span.r5 {
 }
 
 .prep-state {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   font-size: 11.5px;
   color: var(--muted);
+}
+
+.prep-state > span {
+  white-space: nowrap;
 }
 
 .supply .row .btn {
@@ -2474,6 +2481,72 @@ span.r5 {
   gap: 8px;
   padding: 6px 0;
   border-top: 1px solid var(--line);
+}
+
+.provisions-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trend {
+  width: 100%;
+  height: 72px;
+}
+
+.trend rect {
+  fill: var(--line-2);
+}
+
+.trend rect.onTime {
+  fill: var(--ok);
+}
+
+.trend rect.late {
+  fill: var(--accent);
+}
+
+.trend rect.down {
+  fill: var(--late);
+}
+
+.trend rect.skipped {
+  fill: #2f4462;
+}
+
+.trend rect.now {
+  opacity: 0.6;
+}
+
+.trend .target {
+  stroke: var(--muted);
+  stroke-width: 0.4;
+  stroke-dasharray: 1.5 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.legend .onTime {
+  color: var(--ok);
+}
+
+.legend .late {
+  color: var(--accent);
+}
+
+.legend .down {
+  color: var(--late);
+}
+
+.legend .skipped {
+  color: #7f9cc7;
 }
 
 /* Today: meal ratings. */
@@ -2589,6 +2662,53 @@ span.r5 {
 }
 
 :root[data-theme='market'] .btn.primary {
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+}
+
+/* The Field Kitchen theme, unlocked by the 25th Contingency Provisions card: olive green and amber. */
+:root[data-theme='field'] {
+  --bg: #0a0c08;
+  --bg-2: #0f120c;
+  --panel: #141910;
+  --panel-2: #1b2215;
+  --line: #273021;
+  --line-2: #39462f;
+  --muted: #9ca78f;
+  --dim: #646f58;
+  --accent: #e3b247;
+  --accent-2: #f3d58b;
+  --ok: #9fd166;
+}
+
+:root[data-theme='field'] .app {
+  background:
+    radial-gradient(110% 55% at 100% -10%, rgba(227, 178, 71, 0.1), transparent 60%),
+    radial-gradient(90% 45% at 0% 105%, rgba(140, 170, 80, 0.1), transparent 70%),
+    linear-gradient(transparent 0 calc(100% - 1px), rgba(159, 209, 102, 0.03) 0) 0 0 / 100% 24px,
+    linear-gradient(90deg, transparent 0 calc(100% - 1px), rgba(159, 209, 102, 0.03) 0) 0 0 / 24px 100%,
+    var(--bg);
+}
+
+:root[data-theme='field'] .panel {
+  border-color: rgba(159, 209, 102, 0.15);
+  box-shadow: inset 0 1px 0 rgba(243, 213, 139, 0.05);
+}
+
+:root[data-theme='field'] .brand-mark {
+  background: linear-gradient(135deg, var(--accent-2), var(--accent) 50%, #6f7d2f);
+  box-shadow: 0 0 10px rgba(227, 178, 71, 0.4);
+}
+
+:root[data-theme='field'] .topbar,
+:root[data-theme='field'] .tabbar {
+  background: #090b07;
+}
+
+:root[data-theme='field'] .tabbar a.on svg {
+  filter: drop-shadow(0 0 4px rgba(159, 209, 102, 0.55));
+}
+
+:root[data-theme='field'] .btn.primary {
   background: linear-gradient(180deg, var(--accent-2), var(--accent));
 }
 
