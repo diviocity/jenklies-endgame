@@ -431,3 +431,21 @@ describe('milestones', () => {
     expect(earnedTitles(state)).toEqual(['Well Supplied']);
   });
 });
+
+describe('logging prep by hand', () => {
+  it('logs each step once per week, and a tagged task doesn’t log it twice', () => {
+    const state = setup(nov(3, 9));
+    run(state, logPrep(state, 'shopping', nov(3, 9)));
+    expect(() => logPrep(state, 'shopping', nov(3, 10))).toThrow('already logged');
+    run(state, logPrep(state, 'cooking', nov(3, 10)));
+    expect(() => logPrep(state, 'cooking', nov(4, 10))).toThrow('already logged');
+    // From Friday, the buttons log for the next week again.
+    expect(() => run(state, logPrep(state, 'shopping', nov(6, 10)))).not.toThrow();
+    // Saturday's Meijer run still completes, without a second shopping log for next week.
+    tick(state, nov(7, 9));
+    const meijer = today(state, nov(7, 9))!.tasks.find((t) => t.name === 'Meijer run')!;
+    const result = run(state, completeTask(state, meijer.id, nov(7, 10)));
+    expect(result.prep).toBeNull();
+    expect([...state.prepLogs.values()].filter((l) => l.weekKey === '2026-11-09' && l.kind === 'shopping')).toHaveLength(1);
+  });
+});

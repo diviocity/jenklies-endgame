@@ -19,7 +19,7 @@ import type {
 } from '../types';
 import { ActionError, done, type ActionResult } from './errors';
 import { requireAwake } from './hibernation';
-import { mealStamp, settleProvisions, stampWorth, taskPrepLog, taskPrepLogs, taskStamps, type Milestone as ProvisionsMilestone } from './provisions';
+import { mealStamp, prepLogged, settleProvisions, stampWorth, taskPrepLog, taskPrepLogs, taskStamps, type Milestone as ProvisionsMilestone } from './provisions';
 import { taskFitnessEntries, taskFitnessEntry, wouldCount } from './event';
 import { pickIndex, rollRarity, type Rng } from './gacha';
 import { newId } from './ids';
@@ -247,7 +247,8 @@ export function completeTask(state: AppState, taskId: string, now: Date, rating:
   const stamp = mealStamp(day, task, rating, at);
   if (stamp) changes.push(put('stamps', stamp));
   const prep = taskPrepLog(day, task, at);
-  if (prep) {
+  // A step already logged for its week (by hand, say) isn't logged twice; the task still counts.
+  if (prep && !prepLogged(state, prep.weekKey, prep.kind)) {
     changes.push(put('prepLogs', prep));
     result.prep = prep.kind;
   }
