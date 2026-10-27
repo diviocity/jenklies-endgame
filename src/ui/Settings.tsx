@@ -17,6 +17,7 @@ import { BackLink, BuildStamp, confirmDialog, fmt, PageTitle, report, Segmented,
 const THEMES: { value: ThemeId; label: string }[] = [
   { value: 'endgame', label: 'Endgame' },
   { value: 'market', label: 'Market' },
+  { value: 'field', label: 'Field Kitchen' },
 ];
 
 export function SettingsPage() {
@@ -113,7 +114,8 @@ export function SettingsPage() {
             />
             <p class="hint">
               {themes.includes('endgame') && 'Endgame: unlocked by finishing the expedition. '}
-              {themes.includes('market') && 'Market: unlocked by your 20th Salvage Exchange sale.'}
+              {themes.includes('market') && 'Market: unlocked by your 20th Salvage Exchange sale. '}
+              {themes.includes('field') && 'Field Kitchen: unlocked by your 25th Contingency Provisions card.'}
             </p>
           </section>
         )}

@@ -11,6 +11,7 @@ import {
   undoTask,
 } from '../logic/actions';
 import { isHibernating } from '../logic/hibernation';
+import { milestoneName, milestoneReward, type Milestone as ProvisionsMilestone } from '../logic/provisions';
 import { BUCKET_LABELS, deadlineAt, formatDayKey, formatMinutes, formatTime, inputToMinutes } from '../logic/time';
 import { FITNESS, PROVISIONS } from '../config';
 import { play } from '../sound';
@@ -154,13 +155,16 @@ function BucketReward({ status, now, day }: { status: ReturnType<typeof bucketSt
   );
 }
 
-/** Announces Contingency Provisions cards filled (or unfilled by a same-day change). */
-function cardToast(cards: number) {
+/** Announces Contingency Provisions cards filled (or unfilled by a same-day change) and milestones reached. */
+export function cardToast(cards: number, milestones: ProvisionsMilestone[] = []) {
   const { sparksName, shardsName } = names();
   if (cards > 0) {
     play('clear');
     toast(`Provisions card filled! +${fmt(PROVISIONS.card.sparks * cards)} ${sparksName} · +${PROVISIONS.card.shards * cards} ${shardsName}`, 'good');
   } else if (cards < 0) toast('Provisions card unfilled; its reward was taken back');
+  for (const m of milestones) {
+    toast(`Milestone · ${milestoneName(m)}: ${milestoneReward(m, sparksName)}${m.selector ? ' (in your Bag)' : ''}`, 'good');
+  }
 }
 
 function TaskRow({ task, bucketDeadline }: { task: DayTask; bucketDeadline: number }) {
@@ -173,7 +177,7 @@ function TaskRow({ task, bucketDeadline }: { task: DayTask; bucketDeadline: numb
     const stamp = result.stamp ? (result.stamp.held ? ' · stamp held' : ` · +${result.stamp.value} ${result.stamp.value === 1 ? 'stamp' : 'stamps'}`) : '';
     const prep = result.prep ? ` · ${result.prep === 'shopping' ? 'shopping' : 'cooking'} logged` : '';
     toast(`+${result.earned} ${sparksName}${result.onTime ? ' · on time' : ''}${fitness}${stamp}${prep}`, 'good');
-    cardToast(result.cards);
+    cardToast(result.cards, result.milestones);
     if (result.cleared) {
       play('clear');
       const label = BUCKET_LABELS[task.bucket];
@@ -199,7 +203,7 @@ function TaskRow({ task, bucketDeadline }: { task: DayTask; bucketDeadline: numb
     const result = report(await run((s, now) => setMealRating(s, task.id, next, now)));
     if (result === undefined) return;
     toast(next === 'on' ? 'Rated on plan' : 'Rated off plan · no stamp');
-    cardToast(result.cards);
+    cardToast(result.cards, result.milestones);
   };
 
   const done = !!task.completedAt;

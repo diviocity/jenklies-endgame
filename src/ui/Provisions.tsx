@@ -3,6 +3,11 @@ import { isHibernating, isSkippedWeek } from '../logic/hibernation';
 import {
   cardProgress,
   logPrep,
+  milestoneName,
+  milestoneReward,
+  milestonesThrough,
+  nextMilestone,
+  provisions,
   provisionsAlert,
   supplyFor,
   undoPrep,
@@ -14,6 +19,7 @@ import { play } from '../sound';
 import { run, useStore } from '../store';
 import type { PrepKind } from '../types';
 import { Amount, fmt, names, PageTitle, report, succeeded, toast, useNow, useSaving } from './common';
+import { cardToast } from './Today';
 
 const SUPPLY_LABEL = { onTime: 'Up on time', late: 'Up late', down: 'Down' } as const;
 const weekday = (dayKey: string) => keyToDate(dayKey).toLocaleDateString(undefined, { weekday: 'long' });
@@ -66,6 +72,8 @@ export function Provisions() {
       <StampCard />
       <SupplyPanel now={now} skipped={skipped} />
       <ThisWeek now={now} skipped={skipped} />
+      <Milestones />
+      <Stats now={now} />
     </div>
   );
 }
@@ -114,11 +122,17 @@ function StampCard() {
 
 function PrepState({ supply }: { supply: Supply }) {
   const when = (at: string | undefined) => (at ? ` ${keyToDate(dayKeyOf(new Date(at))).toLocaleDateString(undefined, { weekday: 'short' })}` : '');
+  // One line per step, so a mark never wraps away from its word.
   return (
     <span class="mono prep-state">
-      Shopping <Mark ok={!!supply.shopping} />
-      {when(supply.shopping?.at)} · Cooking <Mark ok={!!supply.cooking} />
-      {when(supply.cooking?.at)}
+      <span>
+        Shopping <Mark ok={!!supply.shopping} />
+        {when(supply.shopping?.at)}
+      </span>
+      <span>
+        Cooking <Mark ok={!!supply.cooking} />
+        {when(supply.cooking?.at)}
+      </span>
     </span>
   );
 }
@@ -137,7 +151,7 @@ function SupplyPanel({ now, skipped }: { now: Date; skipped: boolean }) {
     if (!result) return;
     play('complete');
     toast(`${kind === 'shopping' ? 'Shopping' : 'Cooking'} logged for the week of ${keyToDate(result.weekKey).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`, 'good');
-    if (result.cards > 0) toast(`Provisions card filled! +${fmt(PROVISIONS.card.sparks * result.cards)} ${names().sparksName}`, 'good');
+    cardToast(result.cards, result.milestones);
   });
   const undo = async (id: string) => {
     if (succeeded(await run((s, at) => undoPrep(s, id, at)))) toast('Prep log undone');
@@ -231,6 +245,115 @@ function ThisWeek({ now, skipped }: { now: Date; skipped: boolean }) {
           </small>
         </>
       )}
+    </section>
+  );
+}
+
+function Milestones() {
+  const state = useStore();
+  const { sparksName } = names();
+  const p = provisions(state);
+  if (!p) return null;
+  const filled = p.cardsFilled;
+  const next = nextMilestone(filled);
+  const reached = milestonesThrough(filled).filter((m) => (p.milestones ?? []).some((c) => c.id === m.id));
+  const prev = reached[reached.length - 1]?.cards ?? 0;
+  const pct = Math.round(((filled - prev) / (next.cards - prev)) * 100);
+  return (
+    <section class="panel milestones">
+      <h3 class="section-label">Milestones</h3>
+      <div class="milestone-track">
+        <div class="row between">
+          <span class="label">Cards filled</span>
+          <b class="mono">{filled}</b>
+        </div>
+        <div class="meter" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`Cards filled: ${filled}`}>
+          <i style={{ width: `${pct}%` }} />
+        </div>
+        <small class="mono muted">
+          Next: {milestoneName(next)} · {milestoneReward(next, sparksName)} · {next.cards - filled} to go
+        </small>
+      </div>
+      {reached.length > 0 && (
+        <ul class="milestone-list">
+          {reached.map((m) => (
+            <li key={m.id}>
+              <span class="mono">✓ {milestoneName(m)}</span> <span class="muted">{milestoneReward(m, sparksName)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+const SUPPLY_SHORT = { onTime: 'on time', late: 'late', down: 'down', skipped: 'hibernated' } as const;
+
+/** Information only: the on-plan trend with each week's supply line, and lifetime totals. */
+function Stats({ now }: { now: Date }) {
+  const state = useStore();
+  const today = dayKeyOf(now);
+  const thisWeek = weekKeyOf(today);
+  const closed = [...state.provisionWeeks.values()].sort((a, b) => (a.id < b.id ? -1 : 1)).slice(-11);
+  const live = weekMeals(state, thisWeek, now, today);
+  const liveSupply: keyof typeof SUPPLY_SHORT = isSkippedWeek(state, thisWeek, now) ? 'skipped' : supplyFor(state, thisWeek).status;
+  const bars = [
+    ...closed.map((w) => ({ id: w.id, pct: w.scheduled ? w.onPlan / w.scheduled : 0, supply: w.supply, now: false })),
+    { id: thisWeek, pct: live.scheduled ? live.onPlan / live.scheduled : 0, supply: liveSupply, now: true },
+  ];
+  const card = cardProgress(state);
+  const expired = [...state.stamps.values()].filter((s) => s.status === 'expired').length;
+  const counts = { onTime: 0, late: 0, down: 0, skipped: 0 };
+  for (const w of closed) counts[w.supply]++;
+  const w = 100 / 12;
+  const line = 32 - PROVISIONS.ration.share * 30;
+  const label = (id: string) => keyToDate(id).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return (
+    <section class="panel provisions-stats">
+      <h3 class="section-label">Stats</h3>
+      <span class="label">On plan by week</span>
+      <svg
+        class="trend"
+        viewBox="0 0 100 32"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={bars.map((b) => `${b.now ? 'this week' : label(b.id)}: ${Math.round(b.pct * 100)}% on plan, supply ${SUPPLY_SHORT[b.supply]}`).join('; ')}
+      >
+        <line x1="0" x2="100" y1={line} y2={line} class="target" />
+        {bars.map((b, i) => {
+          const h = Math.max(1.5, b.pct * 30);
+          return <rect key={b.id} class={`${b.supply} ${b.now ? 'now' : ''}`} x={i * w + w * 0.15} y={32 - h} width={w * 0.7} height={h} />;
+        })}
+      </svg>
+      <div class="legend mono">
+        <span class="onTime">■ on time</span>
+        <span class="late">■ late</span>
+        <span class="down">■ down</span>
+        <span class="skipped">■ hibernated</span>
+        <span class="target-key">- - 85%</span>
+      </div>
+      {closed.length === 0 ? (
+        <p class="hint small">Weekly history starts after the first reset (Mondays at 4 AM).</p>
+      ) : (
+        <p class="mono small muted">
+          Supply line, last {closed.length} {closed.length === 1 ? 'week' : 'weeks'}: {counts.onTime} on time · {counts.late} late · {counts.down} down
+          {counts.skipped ? ` · ${counts.skipped} hibernated` : ''}
+        </p>
+      )}
+      <div class="rank-stats">
+        <div>
+          <span class="label">Stamps</span>
+          <b class="mono">{fmt(card.counted)}</b>
+        </div>
+        <div>
+          <span class="label">Cards</span>
+          <b class="mono">{card.cards}</b>
+        </div>
+        <div>
+          <span class="label">Expired</span>
+          <b class="mono">{expired}</b>
+        </div>
+      </div>
     </section>
   );
 }

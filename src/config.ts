@@ -164,6 +164,16 @@ export const PROVISIONS = {
   nextWeekDays: [5, 6, 0] as readonly number[],
   /** Shopping this many days ago with no cooking since shows the spoilage reminder. */
   spoilageDays: 2,
+  /** Lifetime milestones, by cards filled. */
+  milestones: [
+    { cards: 1, sparks: 1_000, selector: null, title: 'Well Supplied', theme: null },
+    { cards: 5, sparks: 0, selector: 4, title: null, theme: null },
+    { cards: 10, sparks: 0, selector: 5, title: null, theme: null },
+    { cards: 25, sparks: 0, selector: null, title: 'Provisioner', theme: 'field' },
+  ] as { cards: number; sparks: number; selector: 4 | 5 | null; title: string | null; theme: string | null }[],
+  /** After the last milestone, a 5★ selector every this many cards (50th, 75th, 100th…). */
+  repeatEvery: 25,
+  repeatSelector: 5 as 4 | 5,
 } as const;
 
 export const SCHEMA_VERSION = 6;
