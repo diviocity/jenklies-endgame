@@ -2576,6 +2576,248 @@ span.r5 {
   color: var(--muted);
 }
 
+/* ---------------------------------------------------------------- monumental works */
+
+.sigil .spikes {
+  fill: rgba(255, 95, 87, 0.08);
+  stroke: var(--danger);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.sigil .ring {
+  fill: none;
+  stroke: var(--line-2);
+  stroke-width: 1.2;
+}
+
+.sigil .core {
+  fill: var(--panel);
+  stroke: var(--accent);
+  stroke-width: 1.4;
+}
+
+.sigil .eye {
+  fill: var(--danger);
+  filter: drop-shadow(0 0 3px var(--danger));
+}
+
+.sigil.hidden .spikes,
+.sigil.hidden .core {
+  fill: var(--bg);
+  stroke: var(--line-2);
+}
+
+.sigil.hidden .eye {
+  fill: var(--line-2);
+  filter: none;
+}
+
+.boss-art {
+  display: grid;
+  place-items: center;
+}
+
+.boss {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.boss.waiting {
+  align-items: center;
+  text-align: center;
+}
+
+.boss-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.boss-head h2 {
+  margin: 2px 0;
+  font-size: 22px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.flavor {
+  margin: 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.boss.phase-2 .sigil .spikes {
+  stroke: var(--late);
+}
+
+.boss.phase-3 .sigil {
+  animation: boss-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes boss-pulse {
+  50% {
+    filter: drop-shadow(0 0 6px var(--danger));
+  }
+}
+
+.boss.defeated .sigil {
+  opacity: 0.35;
+  filter: grayscale(1);
+  animation: none;
+}
+
+.defeated-stamp {
+  align-self: flex-start;
+  padding: 2px 10px;
+  border: 2px solid var(--ok);
+  color: var(--ok);
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  transform: rotate(-3deg);
+}
+
+.hp-bar {
+  position: relative;
+  height: 14px;
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  overflow: hidden;
+}
+
+.hp-bar .hp {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #b8322b, var(--danger));
+  transition: width 0.4s ease;
+}
+
+.hp-bar .pending {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.5) 0 3px, transparent 3px 6px);
+}
+
+.hp-bar b {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--text);
+  opacity: 0.5;
+}
+
+.hp-line {
+  font-size: 12.5px;
+}
+
+.pending-text {
+  color: var(--accent);
+}
+
+.assault {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.focus-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.focus-panel .timer {
+  font-size: 40px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.focus-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px calc(var(--safe-right) + 16px) 6px calc(var(--safe-left) + 16px);
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  position: relative;
+  z-index: 5;
+}
+
+.focus-pill i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: boss-pulse 1.2s ease-in-out infinite;
+  box-shadow: 0 0 6px var(--danger);
+}
+
+.window-list,
+.day-off-list,
+.ladder-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  font-size: 13px;
+}
+
+.window-list li,
+.day-off-list li,
+.ladder-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.window-list small {
+  display: block;
+  font-size: 11px;
+}
+
+.window-list b {
+  color: var(--danger);
+}
+
+.day-off-list li {
+  justify-content: space-between;
+}
+
+.days-off input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ladder-list .defeated {
+  color: var(--ok);
+}
+
+.ladder-list .escaped {
+  color: var(--late);
+}
+
+.ladder-list .skipped {
+  color: var(--muted);
+}
+
+.windows,
+.days-off,
+.ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* The Endgame theme, unlocked by finishing the expedition: midnight blue and gold. */
 :root[data-theme='endgame'] {
   --bg: #080a12;

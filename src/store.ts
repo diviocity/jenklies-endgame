@@ -3,6 +3,7 @@ import { commit, loadAll, replaceAll } from './db';
 import { ActionError, ensureDay, type ActionResult } from './logic/actions';
 import { restoredData, type BackupFile } from './logic/backup';
 import { ensureDepot } from './logic/depot';
+import { ensureMonumental } from './logic/monumental';
 import { ensureProvisions } from './logic/provisions';
 import { ensureEvent } from './logic/event';
 import { settleExpedition, type MapNode } from './logic/expedition';
@@ -66,7 +67,7 @@ async function settle(now: Date): Promise<boolean> {
 
 /** Starts a new day's snapshot past 4 AM, runs the weekly event resets when due, and settles the map. */
 export async function tick(now = new Date()): Promise<void> {
-  const changes = [...ensureDay(state, now), ...ensureEvent(state, now), ...ensureDepot(state, now), ...ensureProvisions(state, now)];
+  const changes = [...ensureDay(state, now), ...ensureEvent(state, now), ...ensureDepot(state, now), ...ensureProvisions(state, now), ...ensureMonumental(state, now)];
   if (changes.length) await save(changes);
   const settled = await settle(now);
   if (changes.length || settled) notify();

@@ -1,9 +1,10 @@
 import { unseenDepotWeeks } from '../logic/depot';
 import { unseenProvisionWeeks } from '../logic/provisions';
+import { bossOf, unseenBossWeeks } from '../logic/monumental';
 import { describeReward, markReportsSeen, unseenReports, type WeekReport } from '../logic/expedition';
 import { isHibernating, periodLength, periods } from '../logic/hibernation';
 import { addDays, keyToDate } from '../logic/time';
-import type { DepotWeek, ProvisionsWeek } from '../types';
+import type { BossWeek, DepotWeek, ProvisionsWeek } from '../types';
 import { run, useStore } from '../store';
 import { Amount, fmt, Portal, useNow } from './common';
 
@@ -19,12 +20,15 @@ export function WeeklyReport() {
   const reports = unseenReports(state);
   const depotWeeks = unseenDepotWeeks(state);
   const provisionWeeks = unseenProvisionWeeks(state);
+  const bossWeeks = unseenBossWeeks(state);
   // Held back until you wake up, so it greets you when you're back.
-  if ((reports.length === 0 && depotWeeks.length === 0 && provisionWeeks.length === 0) || isHibernating(state, now)) return null;
+  const none = reports.length === 0 && depotWeeks.length === 0 && provisionWeeks.length === 0 && bossWeeks.length === 0;
+  if (none || isHibernating(state, now)) return null;
   // After a long break, older weeks are summed up and the latest is shown in full.
   const latest = reports[reports.length - 1];
   const earlier = reports.slice(0, -1);
-  const weekId = latest?.week.id ?? depotWeeks[depotWeeks.length - 1]?.id ?? provisionWeeks[provisionWeeks.length - 1].id;
+  const weekId =
+    latest?.week.id ?? depotWeeks[depotWeeks.length - 1]?.id ?? provisionWeeks[provisionWeeks.length - 1]?.id ?? bossWeeks[bossWeeks.length - 1].id;
   const close = () => void run((s) => markReportsSeen(s));
   if (latest?.week.skipped) return <WelcomeBack reports={reports} onClose={close} />;
   const skipped = earlier.filter((r) => r.week.skipped);
@@ -39,6 +43,7 @@ export function WeeklyReport() {
           {latest && <WeekSummary report={latest} />}
           <DepotSummary weeks={depotWeeks} weekId={weekId} />
           <ProvisionsSummary week={provisionWeeks.find((w) => w.id === weekId)} />
+          <BossSummary week={bossWeeks.find((w) => w.id === weekId)} />
           {skipped.length > 0 && (
             <p class="hint small">
               Skipped while hibernating: {skipped.length} {skipped.length === 1 ? 'week' : 'weeks'}. Nothing decayed.
@@ -94,6 +99,25 @@ function WelcomeBack({ reports, onClose }: { reports: WeekReport[]; onClose: () 
         </div>
       </div>
     </Portal>
+  );
+}
+
+/** Monumental Works: the week's boss fight. */
+function BossSummary({ week }: { week?: BossWeek }) {
+  if (!week || week.result === 'skipped') return null;
+  const pct = week.hp > 0 ? Math.round((week.damage / week.hp) * 100) : 0;
+  const reward = week.rewardSparks + week.rewardShards > 0;
+  return (
+    <p class="report-line">
+      Boss: {bossOf(week.boss).name} {week.result === 'defeated' ? 'defeated' : 'escaped'} ({pct}% of {week.hp} HP)
+      {reward && (
+        <>
+          {' '}
+          · <Amount value={week.rewardSparks} currency="sparks" signed /> <Amount value={week.rewardShards} currency="shards" signed />
+        </>
+      )}
+      {week.nextTier !== week.tier && ` · next week Tier ${week.nextTier}`}
+    </p>
   );
 }
 

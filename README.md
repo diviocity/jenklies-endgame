@@ -2,7 +2,7 @@
 
 A personal iPhone web app that turns my daily schedule into a gacha game. I complete my tasks, earn currency (with a bonus for doing them on time), and spend it on pulls. Rare pulls give **indulgences**: treats I've defined for myself and redeem in my free time. Common pulls give collectible **positive affirmations**. It's for me only: no accounts, no server, no monetization.
 
-**Status:** Phases 1 (the core loop) and 2 (the pull animation) are built. The **Frontier Expedition** fitness event is built; see [docs/frontier-expedition.md](docs/frontier-expedition.md). The **Salvage Exchange** selling event is built; see [docs/salvage-exchange.md](docs/salvage-exchange.md). **Contingency Provisions**, the diet event, is built; see [docs/contingency-provisions.md](docs/contingency-provisions.md). **Hibernation**, an app-wide pause for time away, is built; see [docs/hibernation.md](docs/hibernation.md). Streaks, stats and the calendar come later.
+**Status:** Phases 1 (the core loop) and 2 (the pull animation) are built. The **Frontier Expedition** fitness event is built; see [docs/frontier-expedition.md](docs/frontier-expedition.md). The **Salvage Exchange** selling event is built; see [docs/salvage-exchange.md](docs/salvage-exchange.md). **Contingency Provisions**, the diet event, is built; see [docs/contingency-provisions.md](docs/contingency-provisions.md). **Monumental Works**, the work-focus boss fight, is in progress (phase 1 of 2 built); see [docs/monumental-works.md](docs/monumental-works.md). **Hibernation**, an app-wide pause for time away, is built; see [docs/hibernation.md](docs/hibernation.md). Streaks, stats and the calendar come later.
 
 - [Using it](#using-it) · [Development](#development) · [Rules for events](#rules-for-events) · [Design decisions](#design-decisions) · [Project brief](#project-brief)
 
@@ -23,7 +23,7 @@ npm run build      # typecheck + production build into dist/
 
 Stack: Vite, TypeScript and Preact, with IndexedDB through `idb`, and `vite-plugin-pwa` for the manifest and service worker.
 
-- `src/config.ts`: every economy number in one place.
+- `src/config.ts`: every economy number in one place. `EVENTS.rewardMultiplier` (default 1.0) scales the Sparks and Shards of every event's rewards at once (Sparks to the nearest 10, Shards rounded down), to tune overall pacing; daily tasks aren't affected.
 - `src/logic/`: the game rules as plain functions with no UI or browser dependencies (time, rewards, gacha, actions, backup). Each action returns a list of changes that is saved in a single IndexedDB transaction.
 - `src/store.ts` and `src/db.ts`: in-memory state, saving and loading.
 - `src/ui/`: the screens.
