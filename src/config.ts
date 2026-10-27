@@ -152,4 +152,18 @@ export const HIBERNATION = {
   skipWeekDays: 4,
 } as const;
 
-export const SCHEMA_VERSION = 5;
+export const PROVISIONS = {
+  stampsPerCard: 21,
+  /** Stamps count this many times over in a week whose supply line went up on time. */
+  onTimeMultiplier: 2,
+  /** Each filled card. */
+  card: { sparks: 1_000, shards: 3 },
+  /** Weekly ration report: at least this share of the week's scheduled meals (active days) on plan, supply line up. */
+  ration: { share: 0.85, sparks: 500, shards: 5 },
+  /** Prep logged on these weekdays (Fri, Sat, Sun) supplies the next week; Mon–Thu supplies the current one. */
+  nextWeekDays: [5, 6, 0] as readonly number[],
+  /** Shopping this many days ago with no cooking since shows the spoilage reminder. */
+  spoilageDays: 2,
+} as const;
+
+export const SCHEMA_VERSION = 6;

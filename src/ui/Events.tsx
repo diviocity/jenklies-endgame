@@ -8,12 +8,14 @@ import { run, useStore } from '../store';
 import type { FitnessType } from '../types';
 import { isHibernating } from '../logic/hibernation';
 import { ExpeditionMap } from './ExpeditionMap';
+import { Provisions, ProvisionsCard } from './Provisions';
 import { Salvage, SalvageCard } from './Salvage';
 import { Empty, fmt, PageTitle, report, Segmented, Sheet, toast, useNow } from './common';
 
 export function Events({ sub }: { sub?: string }) {
   if (sub === 'frontier') return <Frontier />;
   if (sub === 'salvage') return <Salvage />;
+  if (sub === 'provisions') return <Provisions />;
   return <EventList />;
 }
 
@@ -42,6 +44,7 @@ function EventList() {
         <span aria-hidden="true">›</span>
       </a>
       <SalvageCard />
+      <ProvisionsCard />
     </div>
   );
 }

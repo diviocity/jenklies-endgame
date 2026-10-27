@@ -13,7 +13,7 @@ import {
 import { run, useStore } from '../store';
 import { FITNESS } from '../config';
 import { FITNESS_LABELS, FITNESS_TYPES } from '../logic/rank';
-import type { BucketId, DayType, FitnessType, TemplateTask } from '../types';
+import type { BucketId, DayType, FitnessType, PrepKind, TemplateTask } from '../types';
 import { BackLink, confirmDialog, Empty, fmt, PageTitle, report, Segmented, Sheet, succeeded, useSaving } from './common';
 
 const GROUP_DAYS: Record<DayType, number[]> = { weekday: [1, 2, 3, 4, 5], weekend: [6, 0] };
@@ -45,6 +45,8 @@ type Draft = {
   deadline: string;
   weight: string;
   fitness: FitnessType | '';
+  meal: boolean;
+  prep: PrepKind | '';
 };
 
 export function TemplateEditor() {
@@ -65,9 +67,11 @@ export function TemplateEditor() {
       deadline: t.deadlineOverride === null ? '' : minutesToInput(t.deadlineOverride),
       weight: String(t.weight),
       fitness: t.fitness ?? '',
+      meal: t.meal ?? false,
+      prep: t.prep ?? '',
     });
   const add = (bucket: BucketId) =>
-    setDraft({ name: '', days: GROUP_DAYS[group], bucket, deadline: '', weight: '1', fitness: '' });
+    setDraft({ name: '', days: GROUP_DAYS[group], bucket, deadline: '', weight: '1', fitness: '', meal: false, prep: '' });
 
   return (
     <div class="page">
@@ -108,6 +112,8 @@ export function TemplateEditor() {
                         {t.weight !== 1 && <> · weight {t.weight}</>}
                         {t.deadlineOverride !== null && <> · by {formatMinutes(t.deadlineOverride)}</>}
                         {t.fitness && <> · +{FITNESS.points[t.fitness]} FP</>}
+                        {t.meal && <> · meal</>}
+                        {t.prep && <> · {t.prep === 'shopping' ? 'shopping' : 'cooking'}</>}
                       </span>
                     </button>
                     <span class="order-btns">
@@ -160,6 +166,8 @@ function TaskSheet(props: { draft: Draft; group: DayType; onClose: () => void })
       deadlineOverride: d.deadline ? inputToMinutes(d.deadline) : null,
       weight: Number(d.weight),
       fitness: d.fitness || null,
+      meal: d.meal,
+      prep: d.prep || null,
     };
     const problem = validateTemplateTask(input);
     if (problem) return setError(problem);
@@ -240,6 +248,18 @@ function TaskSheet(props: { draft: Draft; group: DayType; onClose: () => void })
                 {FITNESS_LABELS[t]} (+{FITNESS.points[t]} points)
               </option>
             ))}
+          </select>
+        </label>
+        <label class="switch">
+          <input type="checkbox" checked={d.meal} onChange={(e) => set({ meal: e.currentTarget.checked })} />
+          <span>Meal (Contingency Provisions): rated on or off plan when checked off</span>
+        </label>
+        <label>
+          <span>Prep (Contingency Provisions)</span>
+          <select value={d.prep} onChange={(e) => set({ prep: e.currentTarget.value as Draft['prep'] })}>
+            <option value="">Not a prep step</option>
+            <option value="shopping">Shopping</option>
+            <option value="cooking">Cooking</option>
           </select>
         </label>
         {error && <p class="blocked">{error}</p>}

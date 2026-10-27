@@ -27,6 +27,25 @@ export function applyChanges(state: AppState, changes: Change[]): void {
   }
 }
 
+/** The state as it would be with `changes` applied, without touching the original. */
+export function withChanges(state: AppState, changes: Change[]): AppState {
+  const copy = { ...state } as Record<StoreName, Map<string, unknown>>;
+  for (const store of new Set(changes.map((c) => c.store))) copy[store] = new Map(state[store] as Map<string, unknown>);
+  const view = copy as AppState;
+  applyChanges(view, changes);
+  return view;
+}
+
+export function balances(state: AppState): { sparks: number; shards: number } {
+  let sparks = 0;
+  let shards = 0;
+  for (const e of state.ledger.values()) {
+    if (e.currency === 'sparks') sparks += e.amount;
+    else shards += e.amount;
+  }
+  return { sparks, shards };
+}
+
 export function getMeta(state: AppState): Meta {
   const meta = state.meta.get('meta');
   if (!meta) throw new Error('App data is not loaded.');

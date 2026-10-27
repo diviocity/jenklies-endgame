@@ -1,8 +1,9 @@
 import { unseenDepotWeeks } from '../logic/depot';
+import { unseenProvisionWeeks } from '../logic/provisions';
 import { describeReward, markReportsSeen, unseenReports, type WeekReport } from '../logic/expedition';
 import { isHibernating, periodLength, periods } from '../logic/hibernation';
 import { addDays, keyToDate } from '../logic/time';
-import type { DepotWeek } from '../types';
+import type { DepotWeek, ProvisionsWeek } from '../types';
 import { run, useStore } from '../store';
 import { Amount, fmt, Portal, useNow } from './common';
 
@@ -17,12 +18,13 @@ export function WeeklyReport() {
   const now = useNow();
   const reports = unseenReports(state);
   const depotWeeks = unseenDepotWeeks(state);
+  const provisionWeeks = unseenProvisionWeeks(state);
   // Held back until you wake up, so it greets you when you're back.
-  if ((reports.length === 0 && depotWeeks.length === 0) || isHibernating(state, now)) return null;
+  if ((reports.length === 0 && depotWeeks.length === 0 && provisionWeeks.length === 0) || isHibernating(state, now)) return null;
   // After a long break, older weeks are summed up and the latest is shown in full.
   const latest = reports[reports.length - 1];
   const earlier = reports.slice(0, -1);
-  const weekId = latest?.week.id ?? depotWeeks[depotWeeks.length - 1].id;
+  const weekId = latest?.week.id ?? depotWeeks[depotWeeks.length - 1]?.id ?? provisionWeeks[provisionWeeks.length - 1].id;
   const close = () => void run((s) => markReportsSeen(s));
   if (latest?.week.skipped) return <WelcomeBack reports={reports} onClose={close} />;
   const skipped = earlier.filter((r) => r.week.skipped);
@@ -36,6 +38,7 @@ export function WeeklyReport() {
           <h2>Week of {weekLabel(weekId)}</h2>
           {latest && <WeekSummary report={latest} />}
           <DepotSummary weeks={depotWeeks} weekId={weekId} />
+          <ProvisionsSummary week={provisionWeeks.find((w) => w.id === weekId)} />
           {skipped.length > 0 && (
             <p class="hint small">
               Skipped while hibernating: {skipped.length} {skipped.length === 1 ? 'week' : 'weeks'}. Nothing decayed.
@@ -91,6 +94,26 @@ function WelcomeBack({ reports, onClose }: { reports: WeekReport[]; onClose: () 
         </div>
       </div>
     </Portal>
+  );
+}
+
+const SUPPLY_TEXT = { onTime: 'supply line up on time', late: 'supply line up late', down: 'supply line down', skipped: 'skipped' } as const;
+
+/** Contingency Provisions: the week's meals, supply line and ration report. */
+function ProvisionsSummary({ week }: { week?: ProvisionsWeek }) {
+  if (!week || week.scheduled === 0) return null;
+  const pct = Math.round((week.onPlan / week.scheduled) * 100);
+  return (
+    <p class="report-line">
+      Rations: {week.onPlan}/{week.scheduled} meals on plan ({pct}%) · {SUPPLY_TEXT[week.supply]}
+      {week.rationSparks > 0 ? (
+        <>
+          {' '}
+          · <Amount value={week.rationSparks} currency="sparks" signed /> <Amount value={week.rationShards} currency="shards" signed />
+        </>
+      ) : null}
+      {week.expired > 0 && ` · ${week.expired} held ${week.expired === 1 ? 'stamp' : 'stamps'} expired`}
+    </p>
   );
 }
 

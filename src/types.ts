@@ -42,6 +42,10 @@ export interface Meta {
   lastBackupAt: string | null;
 }
 
+/** Contingency Provisions prep steps: both are needed to put a week's supply line up. */
+export type PrepKind = 'shopping' | 'cooking';
+export type MealRating = 'on' | 'off';
+
 export interface TemplateTask {
   id: string;
   name: string;
@@ -53,6 +57,10 @@ export interface TemplateTask {
   order: number;
   /** Checking this task off also logs this fitness activity. */
   fitness?: FitnessType | null;
+  /** A meal (Contingency Provisions): rated on or off plan when checked off. */
+  meal?: boolean;
+  /** Checking this task off logs this prep step. */
+  prep?: PrepKind | null;
 }
 
 export interface DayTask {
@@ -70,6 +78,10 @@ export interface DayTask {
   onTime: boolean | null;
   /** Copied from the template when the day starts. */
   fitness?: FitnessType | null;
+  meal?: boolean;
+  prep?: PrepKind | null;
+  /** A meal's rating once checked off (a normal tick is on plan). */
+  mealRating?: MealRating | null;
 }
 
 export interface DayBucket {
@@ -110,7 +122,9 @@ export type LedgerReason =
   | 'event_weekly'
   | 'depot_item'
   | 'depot_mission'
-  | 'depot_milestone';
+  | 'depot_milestone'
+  | 'provisions_card'
+  | 'provisions_ration';
 
 export interface LedgerEntry {
   id: string;
@@ -388,6 +402,67 @@ export interface DepotState {
   refillOnWake?: boolean;
 }
 
+// ---------------------------------------------------------------- Contingency Provisions
+
+/** A shopping or cooking step, logged by a tagged task or by hand. */
+export interface PrepLog {
+  id: string;
+  at: string;
+  dayKey: string;
+  kind: PrepKind;
+  /** The week it supplies: logs made Friday–Sunday supply the next week. */
+  weekKey: string;
+  source: 'task' | 'manual';
+  taskId?: string;
+}
+
+/** One on-plan meal. While its week is open, whether it counts or is held follows the supply line. */
+export interface Stamp {
+  id: string;
+  /** The day task (meal) that earned it. */
+  taskId: string;
+  dayKey: string;
+  weekKey: string;
+  at: string;
+  /** Set when the week closes: counted (with its value) or expired. */
+  status?: 'counted' | 'expired';
+  value?: number;
+}
+
+export type SupplyStatus = 'onTime' | 'late' | 'down';
+
+/** A closed week of Contingency Provisions. */
+export interface ProvisionsWeek {
+  /** The week's Monday day key. */
+  id: string;
+  /** 'skipped' when the week was mostly hibernated. */
+  supply: SupplyStatus | 'skipped';
+  /** When both prep steps were in. */
+  upAt: string | null;
+  hibernatedDays: number;
+  /** Meals scheduled and on plan, on active days only. */
+  scheduled: number;
+  onPlan: number;
+  /** Stamp value counted, and stamps that expired. */
+  stamps: number;
+  expired: number;
+  rationSparks: number;
+  rationShards: number;
+  closedAt: string;
+  seen: boolean;
+}
+
+/** Contingency Provisions' running state. */
+export interface ProvisionsState {
+  id: 'provisions';
+  /** The first day tracked (earlier days in the first week aren't counted). */
+  startedDay: string;
+  /** The week in progress; every earlier week has been closed. */
+  currentWeek: string;
+  /** Cards filled and paid so far. */
+  cardsFilled: number;
+}
+
 /** A hibernation period: an app-wide pause. Ended periods are read-only. */
 export interface Hibernation {
   id: string;
@@ -419,6 +494,10 @@ export interface StoreRecords {
   depotWeeks: DepotWeek;
   depot: DepotState;
   hibernations: Hibernation;
+  prepLogs: PrepLog;
+  stamps: Stamp;
+  provisionWeeks: ProvisionsWeek;
+  provisions: ProvisionsState;
 }
 
 export type StoreName = keyof StoreRecords;
@@ -442,6 +521,10 @@ export const STORE_NAMES: StoreName[] = [
   'depotWeeks',
   'depot',
   'hibernations',
+  'prepLogs',
+  'stamps',
+  'provisionWeeks',
+  'provisions',
 ];
 
 /** All app data, held in memory as id → record maps. */

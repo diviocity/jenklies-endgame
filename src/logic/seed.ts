@@ -1,4 +1,4 @@
-import type { Affirmation, BucketId, FitnessType, Indulgence, TemplateTask } from '../types';
+import type { Affirmation, BucketId, FitnessType, Indulgence, PrepKind, TemplateTask } from '../types';
 import { newId } from './ids';
 
 const WEEKDAYS = [1, 2, 3, 4, 5];
@@ -54,6 +54,19 @@ export function fitnessTagFor(name: string): FitnessType | null {
   return FITNESS_TAGS[name.trim().toLowerCase()] ?? null;
 }
 
+/** Meals for Contingency Provisions: breakfast, lunch and dinner, planned treats included. */
+export function mealTagFor(name: string): boolean {
+  return /^(breakfast|lunch|dinner)\b/i.test(name.trim());
+}
+
+/** Prep steps: the grocery run is shopping and the Sunday meal prep is cooking. */
+export function prepTagFor(name: string): PrepKind | null {
+  const n = name.trim().toLowerCase();
+  if (n === 'meijer run') return 'shopping';
+  if (/^meal prep\b/.test(n)) return 'cooking';
+  return null;
+}
+
 export function startingTemplate(): TemplateTask[] {
   return STARTING_TEMPLATE.map(([name, days, bucket, deadlineOverride], i) => ({
     id: newId(),
@@ -64,6 +77,8 @@ export function startingTemplate(): TemplateTask[] {
     weight: 1,
     order: i,
     fitness: fitnessTagFor(name),
+    meal: mealTagFor(name),
+    prep: prepTagFor(name),
   }));
 }
 
