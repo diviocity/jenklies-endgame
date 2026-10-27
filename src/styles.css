@@ -3469,3 +3469,122 @@ textarea {
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+/* Desktop: a left sidebar instead of the bottom tab bar, a wider content area and
+   centered dialogs. Everything is behind these queries, so phones never see it. */
+@media (min-width: 1024px) {
+  .app {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    max-width: 1440px;
+  }
+
+  .topbar {
+    grid-column: 1 / -1;
+    padding: 14px 28px 14px 22px;
+  }
+
+  .topbar::after {
+    width: 220px;
+  }
+
+  .brand {
+    font-size: 12.5px;
+  }
+
+  .hibernate-banner,
+  .focus-pill,
+  main {
+    grid-column: 2;
+  }
+
+  .hibernate-banner,
+  .focus-pill {
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+
+  main {
+    grid-row: 4;
+    padding: 8px 40px 48px;
+  }
+
+  .page {
+    max-width: 820px;
+    margin: 0 auto;
+  }
+
+  .tabbar {
+    grid-column: 1;
+    grid-row: 2 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 18px 12px;
+    border-top: 0;
+    border-right: 1px solid var(--line);
+  }
+
+  .tabbar a {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 14px;
+    height: 46px;
+    padding: 0 14px;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+  }
+
+  .tabbar a.on {
+    background: var(--bg-2);
+  }
+
+  .tabbar a.on::before {
+    top: 10px;
+    bottom: 10px;
+    left: 0;
+    right: auto;
+    width: 2px;
+    height: auto;
+  }
+
+  .tabbar .dot {
+    top: calc(50% - 3.5px);
+    right: 14px;
+  }
+
+  .sheet-overlay {
+    align-items: center;
+    padding: 40px;
+  }
+
+  .sheet {
+    max-width: 560px;
+    max-height: 86vh;
+    border: 1px solid var(--line);
+    border-top: 2px solid var(--accent);
+  }
+
+  .sheet-body {
+    padding-bottom: 20px;
+  }
+
+  .toasts {
+    padding-bottom: 28px;
+  }
+}
+
+/* A mouse can hover; touch screens keep their tap-only look. */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled),
+  .event-card:hover {
+    filter: brightness(1.15);
+  }
+
+  .tabbar a:hover,
+  .segmented button:hover:not(.on),
+  .icon-btn:hover {
+    color: var(--text);
+  }
+}
