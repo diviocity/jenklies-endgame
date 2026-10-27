@@ -4,12 +4,14 @@ import {
   cardProgress,
   logPrep,
   milestoneName,
+  prepLogged,
   milestoneReward,
   milestonesThrough,
   nextMilestone,
   provisions,
   provisionsAlert,
   supplyFor,
+  supplyWeekOf,
   undoPrep,
   weekMeals,
   type Supply,
@@ -145,6 +147,10 @@ function SupplyPanel({ now, skipped }: { now: Date; skipped: boolean }) {
   const current = supplyFor(state, thisWeek);
   const next = supplyFor(state, nextWeek);
   const hibernating = isHibernating(state, now);
+  // The buttons log for the week today supplies (next week from Friday on); each step counts once per week.
+  const supplying = supplyWeekOf(today);
+  const shopped = !!prepLogged(state, supplying, 'shopping');
+  const cooked = !!prepLogged(state, supplying, 'cooking');
   const todaysLogs = [...state.prepLogs.values()].filter((l) => l.dayKey === today).sort((a, b) => (a.at < b.at ? -1 : 1));
   const [busy, log] = useSaving(async (kind: PrepKind) => {
     const result = report(await run((s, at) => logPrep(s, kind, at)));
@@ -184,11 +190,11 @@ function SupplyPanel({ now, skipped }: { now: Date; skipped: boolean }) {
         <p class="paused-note">Hibernating: prep logging is paused until you wake up.</p>
       ) : (
         <div class="row gap">
-          <button class="btn" disabled={busy} onClick={() => log('shopping')}>
-            I shopped
+          <button class={`btn ${shopped ? 'logged' : ''}`} disabled={busy || shopped} onClick={() => log('shopping')}>
+            {shopped ? '✓ Shopped' : 'I shopped'}
           </button>
-          <button class="btn" disabled={busy} onClick={() => log('cooking')}>
-            I cooked
+          <button class={`btn ${cooked ? 'logged' : ''}`} disabled={busy || cooked} onClick={() => log('cooking')}>
+            {cooked ? '✓ Cooked' : 'I cooked'}
           </button>
         </div>
       )}

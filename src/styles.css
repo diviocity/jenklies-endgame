@@ -2467,6 +2467,14 @@ span.r5 {
   flex: 1;
 }
 
+/* A prep step already logged for the week. */
+.supply .btn.logged:disabled {
+  opacity: 1;
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+  background: transparent;
+}
+
 .prep-log {
   list-style: none;
   margin: 0;

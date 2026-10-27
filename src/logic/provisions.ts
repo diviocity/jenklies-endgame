@@ -74,6 +74,11 @@ export function taskPrepLog(day: DayRecord, task: DayTask, at: string): PrepLog 
   return task.prep ? prepLog(task.prep, new Date(at), 'task', task.id, day.id) : null;
 }
 
+/** The log of a prep step for a week, if it's been logged. Each step counts once per week. */
+export function prepLogged(state: AppState, weekKey: string, kind: PrepKind): PrepLog | undefined {
+  return [...state.prepLogs.values()].find((l) => l.weekKey === weekKey && l.kind === kind);
+}
+
 export function taskPrepLogs(state: AppState, dayKey: string, taskId: string): PrepLog[] {
   return [...state.prepLogs.values()].filter((l) => l.dayKey === dayKey && l.taskId === taskId);
 }
@@ -408,6 +413,9 @@ export function unseenProvisionWeeks(state: AppState): ProvisionsWeek[] {
 export function logPrep(state: AppState, kind: PrepKind, now: Date): ActionResult<{ weekKey: string; cards: number; milestones: Milestone[] }> {
   requireAwake(state, now, 'log prep');
   const log = prepLog(kind, now, 'manual');
+  if (prepLogged(state, log.weekKey, kind)) {
+    throw new ActionError(`${kind === 'shopping' ? 'Shopping' : 'Cooking'} is already logged for that week.`);
+  }
   const settled = settleProvisions(state, [put('prepLogs', log)], now);
   return done(settled.changes, { weekKey: log.weekKey, cards: settled.cards, milestones: settled.milestones });
 }
