@@ -54,7 +54,7 @@ export function Today() {
   const pct = day.tasks.length ? Math.round((done.length / day.tasks.length) * 100) : 0;
 
   return (
-    <div class="page">
+    <div class="page wide">
       <section class="hero panel">
         <div class="eyebrow">
           // {day.dayType === 'weekday' ? 'weekday' : 'weekend'} operations · {day.id}
@@ -83,9 +83,11 @@ export function Today() {
         </div>
       </section>
 
-      {day.buckets.map((b, i) => (
-        <BucketCard key={b.id} day={day} bucket={b} index={i} now={now} />
-      ))}
+      <div class="buckets">
+        {day.buckets.map((b, i) => (
+          <BucketCard key={b.id} day={day} bucket={b} index={i} now={now} />
+        ))}
+      </div>
 
       <button class="btn ghost wide" onClick={() => setAdding(true)}>
         + Add a one-off task for today

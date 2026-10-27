@@ -168,26 +168,32 @@ export function Monumental() {
   const m = monumental(state);
   const hibernating = isHibernating(state, now);
   return (
-    <div class="page monumental">
+    <div class="page wide monumental">
       <a class="back" href="#/events">
         ‹ Events
       </a>
       <PageTitle eyebrow="// permanent event" title="Monumental Works" />
-      {fight ? (
-        <BossPanel fight={fight} />
-      ) : (
-        <section class="panel boss waiting">
-          <Sigil name={bossOf((m?.tier ?? 1) - 1).name} hidden />
-          <b>The next boss arrives Monday at 4 AM.</b>
-        </section>
-      )}
-      {hibernating ? <p class="paused-note">Hibernating: focus logging is paused until you wake up.</p> : <FocusControl />}
-      <TodayWindows now={now} />
-      <DaysOff now={now} />
-      <Ladder />
-      <Honors />
-      <Bestiary />
-      <Stats />
+      <div class="cols">
+        <div class="col">
+          {fight ? (
+            <BossPanel fight={fight} />
+          ) : (
+            <section class="panel boss waiting">
+              <Sigil name={bossOf((m?.tier ?? 1) - 1).name} hidden />
+              <b>The next boss arrives Monday at 4 AM.</b>
+            </section>
+          )}
+          {hibernating ? <p class="paused-note">Hibernating: focus logging is paused until you wake up.</p> : <FocusControl />}
+          <TodayWindows now={now} />
+          <DaysOff now={now} />
+        </div>
+        <div class="col side">
+          <Ladder />
+          <Honors />
+          <Bestiary />
+          <Stats />
+        </div>
+      </div>
     </div>
   );
 }

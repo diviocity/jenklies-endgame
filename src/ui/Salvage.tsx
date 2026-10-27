@@ -106,78 +106,83 @@ export function Salvage() {
   const reset = deadlineAt(addDays(view.weekKey, 7), 4 * 60);
 
   return (
-    <div class="page salvage">
+    <div class="page wide salvage">
       <a class="back" href="#/events">
         ‹ Events
       </a>
       <PageTitle eyebrow="// permanent event" title="Salvage Exchange" />
-      <MissionPanel view={view} reset={reset} now={now} />
-      <button class="btn primary wide" onClick={() => setOpen({ kind: 'add' })}>
-        + Add item
-      </button>
+      <div class="cols">
+        <div class="col">
+          <MissionPanel view={view} reset={reset} now={now} />
+          <button class="btn primary wide" onClick={() => setOpen({ kind: 'add' })}>
+            + Add item
+          </button>
 
-      <h3 class="section-label">Featured lots</h3>
-      {state.saleItems.size === 0 ? (
-        <Empty>Add the things you want to sell. The first two become featured lots straight away.</Empty>
-      ) : (
-        <div class="lots">
-          {view.featured.map(({ slot, item }) => (
-            <FeaturedLot key={slot.id} slot={slot} item={item} now={now} onOpen={setOpen} />
-          ))}
-          {Array.from({ length: view.openSlots }, (_, i) => (
-            <div key={`open${i}`} class="panel lot open-slot">
-              <span class="label">Open slot</span>
-              <p class="hint small">Fills at the reset, Monday 4 AM.</p>
+          <h3 class="section-label">Featured lots</h3>
+          {state.saleItems.size === 0 ? (
+            <Empty>Add the things you want to sell. The first two become featured lots straight away.</Empty>
+          ) : (
+            <div class="lots">
+              {view.featured.map(({ slot, item }) => (
+                <FeaturedLot key={slot.id} slot={slot} item={item} now={now} onOpen={setOpen} />
+              ))}
+              {Array.from({ length: view.openSlots }, (_, i) => (
+                <div key={`open${i}`} class="panel lot open-slot">
+                  <span class="label">Open slot</span>
+                  <p class="hint small">Fills at the reset, Monday 4 AM.</p>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+          {view.upNext.length > 0 && (
+            <p class="up-next mono">
+              <span class="label">Up next</span> {view.upNext.map((i) => i.name).join(' · ')}
+            </p>
+          )}
+          {view.nextInLine && (
+            <p class="up-next mono muted">
+              <span class="label">Next in line</span> {view.nextInLine.name}
+            </p>
+          )}
+
+          {view.onMarket.length > 0 && (
+            <>
+              <h3 class="section-label">On the market · {view.onMarket.length}</h3>
+              <ul class="items">
+                {view.onMarket.map((i) => (
+                  <ItemRow key={i.id} item={i} onOpen={setOpen} />
+                ))}
+              </ul>
+            </>
+          )}
+
+          {view.catalog.length > 0 && (
+            <>
+              <h3 class="section-label">Catalog · {view.catalog.length}</h3>
+              <ul class="items">
+                {view.catalog.map((i) => (
+                  <ItemRow key={i.id} item={i} onOpen={setOpen} />
+                ))}
+              </ul>
+            </>
+          )}
+
+          {view.cleared.length > 0 && (
+            <details class="cleared">
+              <summary class="section-label">Cleared · {view.cleared.length}</summary>
+              <ul class="items">
+                {view.cleared.map((i) => (
+                  <ItemRow key={i.id} item={i} onOpen={setOpen} />
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
-      )}
-      {view.upNext.length > 0 && (
-        <p class="up-next mono">
-          <span class="label">Up next</span> {view.upNext.map((i) => i.name).join(' · ')}
-        </p>
-      )}
-      {view.nextInLine && (
-        <p class="up-next mono muted">
-          <span class="label">Next in line</span> {view.nextInLine.name}
-        </p>
-      )}
-
-      {view.onMarket.length > 0 && (
-        <>
-          <h3 class="section-label">On the market · {view.onMarket.length}</h3>
-          <ul class="items">
-            {view.onMarket.map((i) => (
-              <ItemRow key={i.id} item={i} onOpen={setOpen} />
-            ))}
-          </ul>
-        </>
-      )}
-
-      {view.catalog.length > 0 && (
-        <>
-          <h3 class="section-label">Catalog · {view.catalog.length}</h3>
-          <ul class="items">
-            {view.catalog.map((i) => (
-              <ItemRow key={i.id} item={i} onOpen={setOpen} />
-            ))}
-          </ul>
-        </>
-      )}
-
-      {view.cleared.length > 0 && (
-        <details class="cleared">
-          <summary class="section-label">Cleared · {view.cleared.length}</summary>
-          <ul class="items">
-            {view.cleared.map((i) => (
-              <ItemRow key={i.id} item={i} onOpen={setOpen} />
-            ))}
-          </ul>
-        </details>
-      )}
-
-      <Milestones />
-      <Money />
+        <div class="col side">
+          <Milestones />
+          <Money />
+        </div>
+      </div>
 
       {open?.kind === 'add' && <ItemForm categories={view.categories} onClose={close} />}
       {item && open?.kind === 'edit' && <ItemForm item={item} categories={view.categories} onClose={() => setOpen({ kind: 'item', id: item.id })} />}

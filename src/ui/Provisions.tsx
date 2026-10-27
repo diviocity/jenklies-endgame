@@ -60,22 +60,28 @@ export function Provisions() {
   const alert = provisionsAlert(state, now);
   const skipped = isSkippedWeek(state, thisWeek, now);
   return (
-    <div class="page provisions">
+    <div class="page wide provisions">
       <a class="back" href="#/events">
         ‹ Events
       </a>
       <PageTitle eyebrow="// permanent event" title="Contingency Provisions" />
-      {alert.down && <DownBanner supply={alert.supply} />}
-      {alert.spoiling && (
-        <p class="spoilage mono">
-          You shopped {weekday(alert.spoiling.dayKey)} and haven’t cooked yet.
-        </p>
-      )}
-      <StampCard />
-      <SupplyPanel now={now} skipped={skipped} />
-      <ThisWeek now={now} skipped={skipped} />
-      <Milestones />
-      <Stats now={now} />
+      <div class="cols">
+        <div class="col">
+          {alert.down && <DownBanner supply={alert.supply} />}
+          {alert.spoiling && (
+            <p class="spoilage mono">
+              You shopped {weekday(alert.spoiling.dayKey)} and haven’t cooked yet.
+            </p>
+          )}
+          <StampCard />
+          <SupplyPanel now={now} skipped={skipped} />
+          <ThisWeek now={now} skipped={skipped} />
+        </div>
+        <div class="col side">
+          <Milestones />
+          <Stats now={now} />
+        </div>
+      </div>
     </div>
   );
 }

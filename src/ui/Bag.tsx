@@ -16,7 +16,7 @@ type View = 'inventory' | 'affirmations' | 'shop' | 'log';
 export function Bag({ view: initial = 'inventory' }: { view?: View }) {
   const [view, setView] = useState<View>(initial);
   return (
-    <div class="page">
+    <div class="page wide bag">
       <PageTitle eyebrow="// storage" title="Bag" />
       <Segmented
         value={view}

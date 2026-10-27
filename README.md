@@ -62,7 +62,7 @@ These fill gaps in the brief:
 
 - Static web app hosted on GitHub Pages and installed to the iPhone Home Screen as a PWA (manifest, icon, standalone display).
 - Works fully offline (service worker). No backend and no accounts.
-- iPhone-first portrait layout that respects safe areas. It should also work in a desktop browser.
+- iPhone-first portrait layout that respects safe areas. On screens 1024px and wider it switches to a desktop layout: a left sidebar, centered dialogs, and pages laid out in columns. The desktop browser keeps its own save, so move data between devices with Backup.
 - Data stays on the device (IndexedDB preferred). Ask the browser for persistent storage.
 - Export / import: export all data to a JSON file, and import it back (with a confirmation step, replacing current data). Show a "last backup" date somewhere visible.
 - No haptics (iOS web can't vibrate). Sound only after a tap.
