@@ -12,6 +12,7 @@ import { isReady, onExpeditionClaims, useStore } from '../store';
 import { Bag } from './Bag';
 import { Amount, toast, UiHost, useNow } from './common';
 import { Events } from './Events';
+import { FocusPill, ForgottenEnd } from './Monumental';
 import { wake } from './Hibernation';
 import { More } from './More';
 import { Pull } from './Pull';
@@ -168,6 +169,7 @@ export function App() {
           </button>
         </div>
       )}
+      <FocusPill />
       <main>
         {tab === 'today' && <Today />}
         {tab === 'pull' && <Pull />}
@@ -186,6 +188,7 @@ export function App() {
         ))}
       </nav>
       <WeeklyReport />
+      <ForgottenEnd />
       <UiHost />
     </div>
   );

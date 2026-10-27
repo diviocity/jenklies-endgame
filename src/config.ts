@@ -1,5 +1,23 @@
 // Every tunable number in the game lives here.
 
+export const EVENTS = {
+  /** Scales the Sparks and Shards of every event's rewards (not daily tasks), to tune overall pacing in one place. */
+  rewardMultiplier: 1.0,
+} as const;
+
+/** An event reward scaled by EVENTS.rewardMultiplier: Sparks to the nearest 10, Shards rounded down. */
+export function eventReward(sparks: number, shards = 0): { sparks: number; shards: number } {
+  return { sparks: eventSparks(sparks), shards: eventShards(shards) };
+}
+
+export function eventSparks(sparks: number): number {
+  return Math.round((sparks * EVENTS.rewardMultiplier) / 10) * 10;
+}
+
+export function eventShards(shards: number): number {
+  return Math.floor(shards * EVENTS.rewardMultiplier + 1e-9);
+}
+
 export const ECONOMY = {
   /** Sparks for a perfect week: every task done, every task and bucket on time (80 pulls). */
   perfectWeekTarget: 40_000,
@@ -94,8 +112,8 @@ export const EXPEDITION = {
   nodeSpacing: 260,
   /** Every Nth node along the whole route is a Cache. */
   cacheEvery: 4,
-  nodeReward: { sparks: 250, shards: 0 },
-  cacheReward: { sparks: 1_000, shards: 5 },
+  nodeReward: eventReward(250, 0),
+  cacheReward: eventReward(1_000, 5),
   /** Region-end selectors (they replace the node's Sparks): regions 1–2 give 4★, 3–5 give 5★. */
   regionEndSelector: [4, 4, 5, 5, 5] as (4 | 5)[],
   /** Unlocked by finishing the Endgame. */
@@ -104,26 +122,26 @@ export const EXPEDITION = {
 
 export const WEEKLY_REWARDS = {
   /** Paid at the reset for the week that ended; the higher tier replaces the lower one. */
-  half: { share: 0.5, sparks: 500, shards: 2 },
-  full: { share: 1, sparks: 1_500, shards: 5 },
+  half: { share: 0.5, ...eventReward(500, 2) },
+  full: { share: 1, ...eventReward(1_500, 5) },
   /** Extra Shards for holding Rank 20 at the reset. */
-  rank20Shards: 5,
+  rank20Shards: eventShards(5),
 } as const;
 
 export const DEPOT = {
   /** Featured lots: the items you're nudged to list next. */
   slots: 2,
   /** Per-item rewards, each paid once per item, ever. */
-  photographed: { sparks: 100, shards: 0 },
-  listed: { sparks: 500, shards: 0 },
+  photographed: eventReward(100, 0),
+  listed: eventReward(500, 0),
   /** Extra when the item was a featured lot at the time it was listed. */
-  featuredBonus: { sparks: 250, shards: 0 },
+  featuredBonus: eventReward(250, 0),
   /** Extra when listed within this many calendar days (4 AM days) of being photographed. */
   freshDays: 3,
-  freshBonus: { sparks: 250, shards: 0 },
-  handedOff: { sparks: 500, shards: 2 },
+  freshBonus: eventReward(250, 0),
+  handedOff: eventReward(500, 2),
   /** Listing every featured lot of the week before the reset. */
-  mission: { sparks: 500, shards: 5 },
+  mission: eventReward(500, 5),
   /** Platforms offered out of the box; you can add your own. */
   defaultPlatforms: ['eBay', 'Facebook Marketplace', 'Facebook group', 'Discord'],
   /** Age tags on featured lots, by whole weeks in the slot (the last one covers everything after). */
@@ -136,7 +154,7 @@ export const DEPOT = {
     ],
     /** Sales count once an item is handed off. */
     sold: [
-      { count: 1, sparks: 1_000, selector: null, title: 'Open for Business', theme: null },
+      { count: 1, sparks: eventSparks(1_000), selector: null, title: 'Open for Business', theme: null },
       { count: 5, sparks: 0, selector: 4, title: null, theme: null },
       { count: 15, sparks: 0, selector: 5, title: null, theme: null },
       { count: 20, sparks: 0, selector: null, title: 'Quartermaster', theme: 'market' },
@@ -157,16 +175,16 @@ export const PROVISIONS = {
   /** Stamps count this many times over in a week whose supply line went up on time. */
   onTimeMultiplier: 2,
   /** Each filled card. */
-  card: { sparks: 1_000, shards: 3 },
+  card: eventReward(1_000, 3),
   /** Weekly ration report: at least this share of the week's scheduled meals (active days) on plan, supply line up. */
-  ration: { share: 0.85, sparks: 500, shards: 5 },
+  ration: { share: 0.85, ...eventReward(500, 5) },
   /** Prep logged on these weekdays (Fri, Sat, Sun) supplies the next week; Mon–Thu supplies the current one. */
   nextWeekDays: [5, 6, 0] as readonly number[],
   /** Shopping this many days ago with no cooking since shows the spoilage reminder. */
   spoilageDays: 2,
   /** Lifetime milestones, by cards filled. */
   milestones: [
-    { cards: 1, sparks: 1_000, selector: null, title: 'Well Supplied', theme: null },
+    { cards: 1, sparks: eventSparks(1_000), selector: null, title: 'Well Supplied', theme: null },
     { cards: 5, sparks: 0, selector: 4, title: null, theme: null },
     { cards: 10, sparks: 0, selector: 5, title: null, theme: null },
     { cards: 25, sparks: 0, selector: null, title: 'Provisioner', theme: 'field' },
@@ -176,4 +194,48 @@ export const PROVISIONS = {
   repeatSelector: 5 as 4 | 5,
 } as const;
 
-export const SCHEMA_VERSION = 6;
+export const MONUMENTAL = {
+  /** Focus windows are capped at this length; a window left running longer asks when you stopped. */
+  maxWindowMinutes: 180,
+  /** Planned lengths offered when starting (optional). */
+  plannedLengths: [25, 50, 90] as readonly number[],
+  /** Windows shorter than this deal `shortMultiplier` damage. */
+  shortMinutes: 15,
+  shortMultiplier: 0.5,
+  /** A window starting within this many minutes of the previous one's end continues the chain. */
+  chainGapMinutes: 15,
+  /** Damage multiplier for the 1st, 2nd and 3rd-onward window of a chain. */
+  chainMultipliers: [1, 1.25, 1.5] as readonly number[],
+  /** A single window this long is a deep-focus crit, dealing `critBonus` extra. */
+  critMinutes: 90,
+  critBonus: 0.25,
+  /** A week with this many hibernated workdays (Mon–Fri) is skipped. */
+  skipHibernatedWorkdays: 3,
+  /** HP bar phases, as shares of max HP. */
+  phases: [0.66, 0.33] as readonly number[],
+  /** The ladder: boss HP is hours × 60. */
+  tiers: [
+    { hours: 5, name: 'Lethargos', flavor: 'A heavy-lidded titan that sleeps across the road ahead and asks you to lie down beside it.' },
+    { hours: 7, name: 'Akedia Shard', flavor: 'A splinter of old apathy that whispers none of it matters, in your own voice.' },
+    { hours: 9, name: 'Distraxis', flavor: 'A thousand-eyed swarm that turns every glance into a detour.' },
+    { hours: 11, name: 'Marble Procrastes', flavor: 'A flawless statue of tomorrow, carved from every task you meant to start.' },
+    { hours: 13, name: 'Torpor Colossus', flavor: 'It moves only to slow everything around it, and it is never in a hurry.' },
+    { hours: 15, name: 'Oblivane', flavor: 'It drinks intentions the moment you set them down.' },
+    { hours: 17, name: 'Entropos', flavor: 'Every plan it touches frays a little, then quietly comes apart.' },
+    { hours: 19, name: 'Kronoklast, the Hour-Eater', flavor: 'It feeds on afternoons and leaves only the evening’s regret.' },
+    { hours: 21, name: 'Dysergia', flavor: 'A knot of misfiring purpose: all motion, no progress.' },
+    { hours: 23, name: 'Hydra of Tabs', flavor: 'Close one head and two more open, each insisting it matters most.' },
+    { hours: 25, name: 'Akrasia the Unmoved', flavor: 'It knows exactly what you should do, and stands between you and doing it.' },
+  ],
+  /** Weekly rewards (scaled by EVENTS.rewardMultiplier when paid). Defeating Tier t: base + perTier × (t − 1). */
+  defeat: { sparks: 1_000, sparksPerTier: 200, shards: 3, shardsEveryTiers: 2 },
+  /** Dealing at least this share of HP adds the overkill bonus. */
+  overkill: { share: 1.2, sparks: 500, shards: 2 },
+  /** Escaping after dealing at least `share` of HP pays `fraction` of the defeat reward (highest match). */
+  partial: [
+    { share: 0.75, fraction: 0.5 },
+    { share: 0.5, fraction: 0.25 },
+  ] as readonly { share: number; fraction: number }[],
+} as const;
+
+export const SCHEMA_VERSION = 7;

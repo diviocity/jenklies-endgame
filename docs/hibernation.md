@@ -37,6 +37,8 @@ The rules are in `src/logic/hibernation.ts`; the page is **More → Hibernation*
 | 1–3 | prorated by active days ÷ 7: decay, the weak-week threshold, weekly reward thresholds and the rank panel's target | normal | supply check as normal; the 85% counts active days only |
 | 4 or more | skipped: no RP update, no decay, no weekly reward, weak-week streak unchanged | no weekly mission | no supply check or ration report; held stamps count instead of expiring |
 
+**Monumental Works** counts workdays (Mon–Fri) instead: 1–2 hibernated workdays prorate the boss's HP by active workdays ÷ 5, and 3 or more skip the week (no result, no ladder change). Focus logging is off while hibernating, and a running window ends when hibernation starts.
+
 - **Featured lots:** age tags and the 3-day fresh window count only active days. Open slots never refill while hibernating; they fill when you wake up.
 - **Expedition rank history** shows skipped weeks as hibernated bars.
 

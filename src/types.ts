@@ -125,7 +125,8 @@ export type LedgerReason =
   | 'depot_milestone'
   | 'provisions_card'
   | 'provisions_ration'
-  | 'provisions_milestone';
+  | 'provisions_milestone'
+  | 'monumental_weekly';
 
 export interface LedgerEntry {
   id: string;
@@ -480,6 +481,72 @@ export interface ProvisionsClaim {
   prevTitle?: string | null;
 }
 
+// ---------------------------------------------------------------- Monumental Works
+
+/** A stretch of focused work. Only timestamps are stored; the length is worked out from them. */
+export interface FocusWindow {
+  id: string;
+  startAt: string;
+  /** Null while running. */
+  endAt: string | null;
+  /** The day and week it started in (it belongs to them). */
+  dayKey: string;
+  weekKey: string;
+  /** Planned length in minutes, if one was picked. */
+  planned: number | null;
+  /** Started and ended with the buttons, or added by hand. */
+  source: 'live' | 'manual';
+}
+
+/** A workday marked off (holidays, PTO); keyed by its day key. Only this event uses it. */
+export interface DayOff {
+  id: string;
+  createdAt: string;
+}
+
+/** A week's boss: chosen at the reset that starts the week, settled at the next. */
+export interface BossFight {
+  weekKey: string;
+  /** 1–11 (12 is Agony Mode). */
+  tier: number;
+  /** Index into MONUMENTAL.tiers of the boss fought. */
+  boss: number;
+}
+
+/** A closed week of Monumental Works. */
+export interface BossWeek {
+  /** The week's Monday day key. */
+  id: string;
+  tier: number;
+  boss: number;
+  /** HP after prorating for days off and hibernation (0 when skipped). */
+  hp: number;
+  damage: number;
+  result: 'defeated' | 'escaped' | 'skipped';
+  /** When HP first reached 0. */
+  defeatedAt: string | null;
+  /** Tier for the next week, after the ladder moved. */
+  nextTier: number;
+  rewardSparks: number;
+  rewardShards: number;
+  closedAt: string;
+  seen: boolean;
+}
+
+/** Monumental Works' running state: the ladder and this week's boss. */
+export interface MonumentalState {
+  id: 'monumental';
+  startedWeek: string;
+  /** The week in progress; every earlier week has been closed. */
+  currentWeek: string;
+  /** The tier the next boss is drawn from. */
+  tier: number;
+  /** Escapes in a row (two drop a tier). Skipped weeks don't count either way. */
+  escapes: number;
+  /** This week's boss (null only before the event has set one up). */
+  fight: BossFight | null;
+}
+
 /** A hibernation period: an app-wide pause. Ended periods are read-only. */
 export interface Hibernation {
   id: string;
@@ -515,6 +582,10 @@ export interface StoreRecords {
   stamps: Stamp;
   provisionWeeks: ProvisionsWeek;
   provisions: ProvisionsState;
+  focusWindows: FocusWindow;
+  daysOff: DayOff;
+  bossWeeks: BossWeek;
+  monumental: MonumentalState;
 }
 
 export type StoreName = keyof StoreRecords;
@@ -542,6 +613,10 @@ export const STORE_NAMES: StoreName[] = [
   'stamps',
   'provisionWeeks',
   'provisions',
+  'focusWindows',
+  'daysOff',
+  'bossWeeks',
+  'monumental',
 ];
 
 /** All app data, held in memory as id → record maps. */
