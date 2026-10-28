@@ -26,7 +26,7 @@ function EventList() {
   const now = useNow();
   const status = rankStatus(state, now);
   return (
-    <div class="page">
+    <div class="page wide">
       <PageTitle eyebrow="// operations" title="Events" />
       <div class="event-list">
         <a class="event-card panel" href="#/events/frontier">
@@ -70,22 +70,30 @@ function Frontier() {
   if (!status) return <div class="boot">Starting the expedition…</div>;
 
   return (
-    <div class="page">
+    <div class="page wide">
       <a class="back" href="#/events">
         ‹ Events
       </a>
       <PageTitle eyebrow="// permanent event" title="Frontier Expedition" />
-      <Honors />
-      <RankPanel status={status} now={now} />
-      {isHibernating(state, now) ? (
-        <p class="paused-note">Hibernating: logging is paused until you wake up.</p>
-      ) : (
-        <button class="btn primary wide" onClick={() => setLogging(true)}>
-          + Log activity
-        </button>
-      )}
-      <ExpeditionMap />
-      <WeekLog weekKey={status.weekKey} now={now} />
+      <div class="cols">
+        <div class="col">
+          <Honors />
+          <RankPanel status={status} now={now} />
+          {isHibernating(state, now) ? (
+            <p class="paused-note">Hibernating: logging is paused until you wake up.</p>
+          ) : (
+            <button class="btn primary wide" onClick={() => setLogging(true)}>
+              + Log activity
+            </button>
+          )}
+        </div>
+        <div class="col side">
+          <ExpeditionMap />
+        </div>
+        <div class="col">
+          <WeekLog weekKey={status.weekKey} now={now} />
+        </div>
+      </div>
       {logging && <LogSheet onClose={() => setLogging(false)} weekKey={status.weekKey} />}
     </div>
   );

@@ -3470,6 +3470,14 @@ textarea {
   }
 }
 
+/* Column wrappers for the desktop layout. On a phone they vanish and their
+   contents stack in the page as if the wrappers weren't there. */
+.cols,
+.col,
+.buckets {
+  display: contents;
+}
+
 /* Desktop: a left sidebar instead of the bottom tab bar, a wider content area and
    centered dialogs. Everything is behind these queries, so phones never see it. */
 @media (min-width: 1024px) {
@@ -3513,6 +3521,65 @@ textarea {
   .page {
     max-width: 820px;
     margin: 0 auto;
+  }
+
+  /* Pages with room for more than one column. */
+  .page.wide {
+    max-width: 1160px;
+  }
+
+  /* Main column on the left, a narrower side column on the right. A third
+     .col continues the main column below the first. */
+  .cols {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-rows: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  .col.side {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .event-list,
+  .menu {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  /* As many phone-width columns as fit. */
+  .buckets,
+  .bag .items,
+  .lots {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 14px;
+    align-items: start;
+  }
+
+  .bag .collection {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .page.wide > .segmented {
+    width: 100%;
+    max-width: 640px;
+  }
+
+  .stamps {
+    grid-template-columns: repeat(7, 56px);
+    justify-content: space-between;
+    gap: 10px;
   }
 
   .tabbar {
